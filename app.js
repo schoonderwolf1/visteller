@@ -9,14 +9,15 @@ const LENGTE_MAX = 150;
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 18;
+const APP_VERSIE = 19;
 const root = document.getElementById('app');
 
 const state = {
   tab: 'vangen', datum: vandaagStr(), vangsten: [], plekken: [],
   vissers: [{ id: 'v1', naam: 'Ik' }, { id: 'v2', naam: 'Papa' }], actief: 'v1',
   sheet: null, info: null, dagOpen: null, plekOpen: null, diploma: null,
-  geladen: false, weergave: 'tekening', badgeOpen: null, installBaar: false
+  geladen: false, weergave: 'tekening', badgeOpen: null, installBaar: false,
+  posSheet: null
 };
 
 /* De browser vuurt dit event alleen als de PWA nog niet geïnstalleerd is en
@@ -201,7 +202,8 @@ async function diplomaPlaatje(v){
     if (v.foto) {
       const s = Math.max(bw / beeld.width, bh / beeld.height);
       const dw = beeld.width * s, dh = beeld.height * s;
-      c.drawImage(beeld, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
+      const pos = v.fotoPos || { x: 50, y: 50 };
+      c.drawImage(beeld, bx + (bw - dw) * (pos.x / 100), by + (bh - dh) * (pos.y / 100), dw, dh);
     } else {
       c.drawImage(beeld, bx, by, bw, bh);
     }
@@ -392,12 +394,46 @@ function wisVangst(id){ commit({ vangsten: state.vangsten.filter(v => v.id !== i
 async function plekFoto(id, e){
   const file = e.target.files && e.target.files[0];
   if (!file) return;
-  try { const url = await kleinerMaken(file); commit({ plekken: state.plekken.map(p => p.id === id ? { ...p, foto: url } : p) }); } catch (err) {}
+  try { const url = await kleinerMaken(file); commit({ plekken: state.plekken.map(p => p.id === id ? { ...p, foto: url, fotoPos: null } : p) }); } catch (err) {}
 }
 async function vangstFoto(id, e){
   const file = e.target.files && e.target.files[0];
   if (!file) return;
-  try { const url = await kleinerMaken(file); commit({ vangsten: state.vangsten.map(v => v.id === id ? { ...v, foto: url } : v) }); } catch (err) {}
+  try { const url = await kleinerMaken(file); commit({ vangsten: state.vangsten.map(v => v.id === id ? { ...v, foto: url, fotoPos: null } : v) }); } catch (err) {}
+}
+/* fotoPos onthoudt welk deel van de foto zichtbaar moet blijven als hij
+   uitgesneden wordt (object-fit:cover knipt anders soms net de vis eraf). */
+function fotoPosCss(obj){ const p = obj && obj.fotoPos; return (p ? p.x : 50) + '% ' + (p ? p.y : 50) + '%'; }
+function zetFotoPos(type, id, x, y){
+  if (type === 'plek') commit({ plekken: state.plekken.map(p => p.id === id ? { ...p, fotoPos: { x, y } } : p) });
+  else commit({ vangsten: state.vangsten.map(v => v.id === id ? { ...v, fotoPos: { x, y } } : v) });
+}
+function renderPosSheet(){
+  const ps = state.posSheet;
+  const obj = ps.type === 'plek' ? state.plekken.find(p => p.id === ps.id) : state.vangsten.find(v => v.id === ps.id);
+  if (!obj || !obj.foto) return '';
+  const pos = obj.fotoPos || { x: 50, y: 50 };
+  const naam = ps.type === 'plek' ? obj.naam : obj.soort;
+  const sluitId = on(() => history.back());
+  const stopId = on(e => e.stopPropagation());
+  let cellen = '';
+  [0, 50, 100].forEach(ry => [0, 50, 100].forEach(rx => {
+    const actief = pos.x === rx && pos.y === ry;
+    const id = on(() => zetFotoPos(ps.type, ps.id, rx, ry));
+    cellen += `<button data-click="${id}" aria-label="Zet vis hier in beeld" style="border-radius:10px;border:3px solid ${actief ? '#F0A81E' : 'rgba(255,255,255,.8)'};background:${actief ? 'rgba(240,168,30,.35)' : 'rgba(255,255,255,.12)'};min-height:44px"></button>`;
+  }));
+  return `<div data-click="${sluitId}" style="position:fixed;inset:0;background:rgba(11,50,55,.55);z-index:45;display:flex;align-items:flex-end;justify-content:center">
+    <div data-click="${stopId}" style="width:100%;max-width:560px;background:#fff;border-radius:26px 26px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom))">
+      <div style="width:44px;height:5px;border-radius:3px;background:#CBDCD9;margin:0 auto 14px"></div>
+      <h2 style="font-size:18px;font-weight:800;margin:0 0 4px">Foto verschuiven</h2>
+      <p style="font-size:14px;color:#6E8A8C;margin:0 0 12px">Tik waar ${esc(naam)} in het kader moet komen te staan.</p>
+      <div style="position:relative;border-radius:16px;overflow:hidden;height:220px">
+        <img src="${obj.foto}" alt="" style="display:block;width:100%;height:100%;object-fit:cover;object-position:${pos.x}% ${pos.y}%">
+        <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:6px;padding:6px">${cellen}</div>
+      </div>
+      <button data-click="${sluitId}" style="margin-top:14px;width:100%;background:#1E7A8C;border:0;color:#fff;border-radius:14px;padding:13px;font-size:15px;font-weight:800">Klaar</button>
+    </div>
+  </div>`;
 }
 function hernoemPlek(p){
   const naam = window.prompt('Hoe heet deze visplek?', p.naam);
@@ -677,6 +713,7 @@ function renderPlekken(){
       const openId = on(() => naarSubscherm({ tab: 'plek', plekOpen: p.id }));
       const hernoemId = on(() => hernoemPlek(p));
       const fotoId = on(e => plekFoto(p.id, e));
+      const verschuifId = on(() => naarSubscherm({ posSheet: { type: 'plek', id: p.id } }));
       const regel = vs.length ? ((vs.length === 1 ? '1 vis' : vs.length + ' vissen') + ' · ' + dgN + (dgN === 1 ? ' dag' : ' dagen')) : 'nog geen vangst van ' + ikNu.naam;
       return `<div style="background:#fff;border-radius:16px;padding:11px 12px;margin-bottom:8px;box-shadow:0 2px 0 #CBDCD9">
         <button data-click="${openId}" style="all:unset;display:flex;align-items:flex-start;gap:10px;width:100%;cursor:pointer">
@@ -693,8 +730,9 @@ function renderPlekken(){
             <input type="file" accept="image/*" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
           </label>
           <button data-click="${hernoemId}" style="flex:none;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700">Naam</button>
+          ${p.foto ? `<button data-click="${verschuifId}" style="flex:none;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700">Verschuiven</button>` : ''}
         </div>
-        ${p.foto ? `<div style="margin-top:10px;padding-left:22px"><img src="${p.foto}" alt="Foto van ${esc(p.naam)}" style="display:block;width:100%;height:170px;object-fit:cover;border-radius:12px"></div>` : ''}
+        ${p.foto ? `<div style="margin-top:10px;padding-left:22px"><img src="${p.foto}" alt="Foto van ${esc(p.naam)}" style="display:block;width:100%;height:170px;object-fit:cover;object-position:${fotoPosCss(p)};border-radius:12px"></div>` : ''}
       </div>`;
     }).join('');
 
@@ -717,18 +755,20 @@ function renderDag(){
     const diplomaId = on(() => deelDiploma(v));
     const wisId = on(() => wisVangst(v.id));
     const fotoId = on(e => vangstFoto(v.id, e));
+    const verschuifId = on(() => naarSubscherm({ posSheet: { type: 'vangst', id: v.id } }));
     return `<div style="background:#fff;border-radius:18px;padding:10px 12px 10px 6px;margin-bottom:10px;box-shadow:0 3px 0 #CBDCD9">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="flex:none;width:86px;height:46px;display:grid;place-items:center;overflow:hidden">${svgVoor(f, VISSEN.indexOf(f), 'm')}</span>
         <span style="flex:1;min-width:0"><span style="display:block;font-size:17px;font-weight:800">${esc(v.soort)}</span><span style="display:block;font-size:13px;color:#6E8A8C;line-height:1.35">${esc(regelVan(v))}</span></span>
         <button data-click="${wisId}" aria-label="Deze vangst weghalen" style="flex:none;width:38px;height:38px;border-radius:50%;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;font-size:17px;font-weight:800;line-height:1">×</button>
       </div>
-      ${v.foto ? `<img src="${v.foto}" alt="Foto van de vangst" style="display:block;width:100%;height:180px;object-fit:cover;border-radius:12px;margin-top:8px">` : ''}
+      ${v.foto ? `<img src="${v.foto}" alt="Foto van de vangst" style="display:block;width:100%;height:180px;object-fit:cover;object-position:${fotoPosCss(v)};border-radius:12px;margin-top:8px">` : ''}
       <div style="display:flex;gap:8px;margin-top:8px">
         <label style="flex:1;position:relative;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700;text-align:center">
           ${v.foto ? 'Andere foto' : 'Foto toevoegen'}
           <input type="file" accept="image/*" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
         </label>
+        ${v.foto ? `<button data-click="${verschuifId}" style="flex:1;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700">Verschuiven</button>` : ''}
         <button data-click="${diplomaId}" style="flex:1;background:#F4F8F7;border:2px solid #CBDCD9;color:#17545C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:800">Diploma</button>
       </div>
     </div>`;
@@ -758,6 +798,7 @@ function renderPlek(){
   const fotoId = on(e => plekFoto(po.id, e));
   const hernoemId = on(() => hernoemPlek(po));
   const verwijderId = on(() => verwijderPlek(po));
+  const verschuifId = on(() => naarSubscherm({ posSheet: { type: 'plek', id: po.id } }));
 
   const soortenHtml = Object.keys(per).sort((a, b) => per[b] - per[a]).map(naam => {
     const f = vinden(naam);
@@ -792,13 +833,14 @@ function renderPlek(){
   return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
     ${terugKnop(terugId, 'Alle visplekken')}
     <h1 style="font-size:26px;font-weight:800;margin:0 0 12px">${esc(po.naam)}</h1>
-    ${po.foto ? `<div style="margin-bottom:10px"><img src="${po.foto}" alt="Foto van ${esc(po.naam)}" style="display:block;width:100%;height:210px;object-fit:cover;border-radius:18px"></div>` : ''}
+    ${po.foto ? `<div style="margin-bottom:10px"><img src="${po.foto}" alt="Foto van ${esc(po.naam)}" style="display:block;width:100%;height:210px;object-fit:cover;object-position:${fotoPosCss(po)};border-radius:18px"></div>` : ''}
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <label style="flex:1;position:relative;background:#fff;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:14px;padding:12px;font-size:14px;font-weight:700;text-align:center">
         ${po.foto ? 'Andere foto' : 'Foto van deze plek'}
         <input type="file" accept="image/*" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
       </label>
       <button data-click="${hernoemId}" style="flex:none;background:#fff;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:14px;padding:12px 18px;font-size:14px;font-weight:700">Naam</button>
+      ${po.foto ? `<button data-click="${verschuifId}" style="flex:none;background:#fff;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:14px;padding:12px 18px;font-size:14px;font-weight:700">Verschuiven</button>` : ''}
     </div>
     ${pk ? `<div style="background:#fff;border-radius:18px;padding:10px;margin-bottom:10px;box-shadow:0 3px 0 #CBDCD9">${pk}</div>` : ''}
     ${kaartUrl ? `<a href="${kaartUrl}" target="_blank" rel="noopener" style="display:block;text-align:center;background:#1E7A8C;color:#fff;border-radius:14px;padding:12px;font-weight:800;font-size:14px;text-decoration:none;margin-bottom:14px">Bekijk deze plek op de echte kaart</a>` : ''}
@@ -1015,7 +1057,8 @@ function render(){
     + renderNav()
     + (state.sheet ? renderSheet() : '')
     + (state.diploma ? renderDiploma() : '')
-    + (state.badgeOpen ? renderBadgeScherm() : '');
+    + (state.badgeOpen ? renderBadgeScherm() : '')
+    + (state.posSheet ? renderPosSheet() : '');
 
   /* Bij een nieuwe "pagina" bovenaan beginnen — anders opent bv. het infoscherm
      van een vis onderaan het scherm gewoon op de scrollpositie van de vorige
@@ -1046,6 +1089,7 @@ document.addEventListener('input', e => {
    naarSubscherm()). Sluit hier telkens het "bovenste" open subscherm — in
    dezelfde volgorde als waarin ze geopend kunnen worden. */
 window.addEventListener('popstate', () => {
+  if (state.posSheet) { setUi({ posSheet: null }); return; }
   if (state.sheet) { setUi({ sheet: null }); return; }
   if (state.diploma) { setUi({ diploma: null }); return; }
   if (state.badgeOpen) { setUi({ badgeOpen: null }); return; }

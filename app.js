@@ -5,7 +5,7 @@ const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 15;
+const APP_VERSIE = 16;
 const root = document.getElementById('app');
 
 const state = {
@@ -651,20 +651,22 @@ function renderPlekken(){
       const fotoId = on(e => plekFoto(p.id, e));
       const regel = vs.length ? ((vs.length === 1 ? '1 vis' : vs.length + ' vissen') + ' · ' + dgN + (dgN === 1 ? ' dag' : ' dagen')) : 'nog geen vangst van ' + ikNu.naam;
       return `<div style="background:#fff;border-radius:16px;padding:11px 12px;margin-bottom:8px;box-shadow:0 2px 0 #CBDCD9">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="flex:none;width:12px;height:12px;border-radius:50%;background:#2F7D4F"></span>
-          <button data-click="${openId}" style="all:unset;flex:1;min-width:0;cursor:pointer">
+        <button data-click="${openId}" style="all:unset;display:flex;align-items:flex-start;gap:10px;width:100%;cursor:pointer">
+          <span style="flex:none;width:12px;height:12px;border-radius:50%;background:#2F7D4F;margin-top:6px"></span>
+          <span style="flex:1;min-width:0">
             <span style="display:block;font-size:16px;font-weight:800;color:#123A3F">${esc(p.naam)} <span style="color:#6E8A8C">›</span></span>
             <span style="display:block;font-size:13px;color:#6E8A8C">${esc(regel)}</span>
             ${stukjes.length ? `<span style="display:block;font-size:13px;color:#2F7D4F;font-weight:700;line-height:1.3">${esc(stukjes.join(' · '))}</span>` : ''}
-          </button>
+          </span>
+        </button>
+        <div style="display:flex;gap:10px;margin-top:10px;padding-left:22px">
           <label style="flex:none;position:relative;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700">
             ${p.foto ? 'Foto ✓' : 'Foto'}
             <input type="file" accept="image/*" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
           </label>
           <button data-click="${hernoemId}" style="flex:none;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700">Naam</button>
         </div>
-        ${p.foto ? `<div style="margin-top:10px"><img src="${p.foto}" alt="Foto van ${esc(p.naam)}" style="display:block;width:100%;height:170px;object-fit:cover;border-radius:12px"></div>` : ''}
+        ${p.foto ? `<div style="margin-top:10px;padding-left:22px"><img src="${p.foto}" alt="Foto van ${esc(p.naam)}" style="display:block;width:100%;height:170px;object-fit:cover;border-radius:12px"></div>` : ''}
       </div>`;
     }).join('');
 
@@ -829,7 +831,7 @@ function renderInfo(){
       </div>
       <div style="margin-bottom:12px">
         <div style="height:16px;background:#E9F3EF;border-radius:8px;overflow:hidden"><span style="display:block;height:100%;width:${Math.round(f.max / 130 * 100)}%;background:#F0A81E;border-radius:8px"></span></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:#6E8A8C;margin-top:4px"><span>0 cm</span><span>${f.max} cm</span><span>130 cm</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#6E8A8C;margin-top:4px"><span>0 cm</span><span>130 cm</span></div>
       </div>
       <div style="display:flex;gap:12px;padding:10px 0;border-top:2px solid #E9F3EF;font-size:15px;line-height:1.45"><b style="flex:none;width:100px;color:#6E8A8C;font-weight:800">Hoe groot</b><span>${esc(f.feit.groot)}</span></div>
       <div style="display:flex;gap:12px;padding:10px 0;border-top:2px solid #E9F3EF;font-size:15px;line-height:1.45"><b style="flex:none;width:100px;color:#6E8A8C;font-weight:800">Wat eet hij</b><span>${esc(f.feit.eet)}</span></div>

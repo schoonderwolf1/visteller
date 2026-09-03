@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17545C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Visteller">
+<title>Visteller</title>
+<meta name="description" content="Vink aan welke vis je hebt gevangen en bewaar je visdagen en visplekken.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{font-family:'Baloo 2',system-ui,-apple-system,sans-serif;font-weight:600;background:#E9F3EF;color:#123A3F;font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+  button{cursor:pointer;font-family:inherit}
+  input{font-family:inherit}
+  a{color:#17545C}
+  a:hover{color:#0E4C5A}
+  :focus-visible{outline:3px solid #F0A81E;outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="./fish.js"></script>
+<script src="./db.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

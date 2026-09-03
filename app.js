@@ -9,7 +9,7 @@ const LENGTE_MAX = 150;
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 19;
+const APP_VERSIE = 20;
 const root = document.getElementById('app');
 
 const state = {
@@ -506,7 +506,8 @@ function renderVangen(){
   </div>` : '';
 
   return `<div>
-    <div style="background:linear-gradient(160deg,#1E7A8C 0%,#17545C 60%,#134A52 100%);border-radius:0 0 26px 26px;margin:0 -14px 18px;padding:calc(env(safe-area-inset-top) + 18px) 18px 20px;color:#fff;position:relative;overflow:hidden">
+    ${state.installBaar ? `<button data-click="${on(installeerApp)}" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#F0A81E;border:0;color:#123A3F;border-radius:16px;padding:14px;font-size:15px;font-weight:800;box-shadow:0 3px 0 #C7860F;margin-top:calc(env(safe-area-inset-top) + 12px);margin-bottom:2px">📲 Zet Visteller op je startscherm</button>` : ''}
+    <div style="background:linear-gradient(160deg,#1E7A8C 0%,#17545C 60%,#134A52 100%);border-radius:0 0 26px 26px;margin:0 -14px 18px;padding:${state.installBaar ? '18px' : 'calc(env(safe-area-inset-top) + 18px)'} 18px 20px;color:#fff;position:relative;overflow:hidden">
       <div style="position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.06)"></div>
       <div style="position:relative;display:flex;align-items:center;gap:14px">
         <div style="flex:1;min-width:0">
@@ -535,7 +536,6 @@ function renderVangen(){
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${kaarten}</div>
     ${vandaagLijst}
-    ${state.installBaar ? `<button data-click="${on(installeerApp)}" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#F0A81E;border:0;color:#123A3F;border-radius:16px;padding:14px;font-size:15px;font-weight:800;box-shadow:0 3px 0 #C7860F;margin-top:16px">📲 Zet Visteller op je startscherm</button>` : ''}
     <button data-click="${on(controleerUpdate)}" style="all:unset;display:block;width:100%;text-align:center;font-size:11px;color:#B7C6C4;margin-top:24px;cursor:pointer">Visteller v${APP_VERSIE} · tik om te controleren op updates</button>
   </div>`;
 }

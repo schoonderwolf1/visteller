@@ -5,15 +5,35 @@ const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 16;
+const APP_VERSIE = 17;
 const root = document.getElementById('app');
 
 const state = {
   tab: 'vangen', datum: vandaagStr(), vangsten: [], plekken: [],
   vissers: [{ id: 'v1', naam: 'Ik' }, { id: 'v2', naam: 'Papa' }], actief: 'v1',
   sheet: null, info: null, dagOpen: null, plekOpen: null, diploma: null,
-  geladen: false, weergave: 'tekening', badgeOpen: null
+  geladen: false, weergave: 'tekening', badgeOpen: null, installBaar: false
 };
+
+/* De browser vuurt dit event alleen als de PWA nog niet geïnstalleerd is en
+   aan de install-criteria voldoet. We onderscheppen 'm zodat we zelf een
+   knop kunnen tonen (anders verschijnt er soms een browser-eigen balkje dat
+   je makkelijk mist) en bewaren 'm om later handmatig te tonen. */
+let uitgesteldeInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  uitgesteldeInstall = e;
+  setUi({ installBaar: true });
+});
+window.addEventListener('appinstalled', () => { uitgesteldeInstall = null; setUi({ installBaar: false }); });
+
+async function installeerApp(){
+  if (!uitgesteldeInstall) return;
+  uitgesteldeInstall.prompt();
+  await uitgesteldeInstall.userChoice;
+  uitgesteldeInstall = null;
+  setUi({ installBaar: false });
+}
 
 let registry = {};
 let idc = 0;
@@ -472,6 +492,7 @@ function renderVangen(){
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${kaarten}</div>
     ${vandaagLijst}
+    ${state.installBaar ? `<button data-click="${on(installeerApp)}" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#F0A81E;border:0;color:#123A3F;border-radius:16px;padding:14px;font-size:15px;font-weight:800;box-shadow:0 3px 0 #C7860F;margin-top:16px">📲 Zet Visteller op je startscherm</button>` : ''}
     <button data-click="${on(controleerUpdate)}" style="all:unset;display:block;width:100%;text-align:center;font-size:11px;color:#B7C6C4;margin-top:24px;cursor:pointer">Visteller v${APP_VERSIE} · tik om te controleren op updates</button>
   </div>`;
 }

@@ -9,7 +9,7 @@ const LENGTE_MAX = 150;
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 21;
+const APP_VERSIE = 22;
 const root = document.getElementById('app');
 
 const state = {
@@ -55,17 +55,26 @@ function svgVoor(f, i, sleutel, grijs){
 /* Handmatige update-check: de service worker ververst zichzelf normaal op de
    achtergrond, maar dat kan soms lang duren voor het écht doorkomt. Tikken op
    het versienummer forceert een directe check, zodat je niet hoeft te
-   gokken of "nog een keer sluiten en openen" al genoeg is geweest. */
+   gokken of "nog een keer sluiten en openen" al genoeg is geweest.
+   We vertrouwen niet meer op het "nette" reg.update()-mechanisme: soms
+   blijft een telefoon toch op een oude versie hangen (bijv. omdat de
+   vorige service worker of zijn cache al vastzat voordat een cachingfix
+   daarin actief kon worden). Daarom breken we hier alles radicaal af en
+   opnieuw op: alle service workers weg, alle caches leeg, en herladen met
+   een cache-ontwijkende querystring zodat zelfs de kale HTTP-cache van de
+   browser niet in de weg kan zitten. */
 async function controleerUpdate(){
   try {
-    if (!('serviceWorker' in navigator)) { window.location.reload(); return; }
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (!reg) { window.location.reload(); return; }
-    await reg.update();
-    window.alert('Gecontroleerd op updates. Is er een nieuwe versie, dan herlaadt de app zichzelf zo automatisch.');
-  } catch (e) {
-    window.location.reload();
-  }
+    if ('serviceWorker' in navigator) {
+      const registraties = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registraties.map(r => r.unregister()));
+    }
+    if ('caches' in window) {
+      const namen = await caches.keys();
+      await Promise.all(namen.map(n => caches.delete(n)));
+    }
+  } catch (e) {}
+  window.location.href = location.pathname + '?vers=' + Date.now();
 }
 
 function setUi(patch){ Object.assign(state, patch); render(); }
@@ -536,7 +545,7 @@ function renderVangen(){
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${kaarten}</div>
     ${vandaagLijst}
-    <button data-click="${on(controleerUpdate)}" style="all:unset;display:block;width:100%;text-align:center;font-size:11px;color:#B7C6C4;margin-top:24px;cursor:pointer">Visteller v${APP_VERSIE} · tik om te controleren op updates</button>
+    <button data-click="${on(controleerUpdate)}" style="all:unset;display:block;width:100%;text-align:center;font-size:11px;color:#B7C6C4;margin-top:24px;cursor:pointer">Visteller v${APP_VERSIE} · tik om de nieuwste versie op te halen</button>
   </div>`;
 }
 function regelVan(v){
@@ -1115,11 +1124,18 @@ async function init(){
   render();
 
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
+    const registreer = () => {
       navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});
       let herladen = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => { if (herladen) return; herladen = true; location.reload(); });
-    });
+    };
+    /* Niet zomaar op het 'load'-event wachten: init() haalt eerst iets uit
+       IndexedDB op (await hierboven), en als dat sneller klaar is dan de
+       pagina laadt, is 'load' dan al voorbij — de listener zou dan nooit
+       meer afgaan en de service worker (dus ook alle toekomstige updates)
+       registreert zich stilletjes nooit. */
+    if (document.readyState === 'complete') registreer();
+    else window.addEventListener('load', registreer);
   }
 }
 init();

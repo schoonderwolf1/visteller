@@ -768,6 +768,22 @@ function renderInfo(){
   const kanVoorlezen = !!window.speechSynthesis;
   const voorleesId = on(() => voorlezen(f.n + '. ' + f.feit.wist + ' Hij wordt ' + f.feit.groot + ' groot en eet ' + f.feit.eet + '.'));
   const jij = (n ? (n === 1 ? '1 keer' : n + ' keer') : 'nog geen') + (r ? ' · record ' + r + ' cm' : '');
+
+  const vangstenVanSoort = eigen.filter(v => v.soort === f.n).slice().sort((a, b) => b.ts - a.ts);
+  const vangstenHtml = vangstenVanSoort.length ? `<div style="margin-bottom:14px">
+    <h3 style="font-size:17px;font-weight:800;margin:0 0 10px">Al mijn vangsten van deze soort</h3>
+    ${vangstenVanSoort.map(v => {
+      const diplomaId = on(() => deelDiploma(v));
+      const t = new Date(v.ts);
+      const p = state.plekken.find(x => x.id === v.plekId);
+      const regel = [v.lengte ? v.lengte + ' cm' : null, p ? p.naam : null, String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')].filter(Boolean).join(' · ');
+      return `<div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:10px 12px;margin-bottom:8px;box-shadow:0 2px 0 #CBDCD9">
+        <span style="flex:1;min-width:0"><span style="display:block;font-size:16px;font-weight:800">${esc(langeDag(v.datum))}</span><span style="display:block;font-size:13px;color:#6E8A8C">${esc(regel)}</span></span>
+        <button data-click="${diplomaId}" style="flex:none;background:#F4F8F7;border:2px solid #CBDCD9;color:#17545C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:800">Diploma</button>
+      </div>`;
+    }).join('')}
+  </div>` : '';
+
   return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
     <button data-click="${terugId}" style="background:none;border:0;color:#6E8A8C;font-size:15px;font-weight:800;padding:6px 0;margin-bottom:6px">‹ Terug</button>
     <div style="background:#fff;border-radius:24px;padding:16px;box-shadow:0 3px 0 #CBDCD9;margin-bottom:14px">
@@ -788,6 +804,7 @@ function renderInfo(){
       <div style="display:flex;gap:12px;padding:10px 0;border-top:2px solid #E9F3EF;font-size:15px;line-height:1.45"><b style="flex:none;width:100px;color:#6E8A8C;font-weight:800">Wist je dat</b><span>${esc(f.feit.wist)}</span></div>
       <div style="display:flex;gap:12px;padding:10px 0;border-top:2px solid #E9F3EF;font-size:15px;line-height:1.45"><b style="flex:none;width:100px;color:#6E8A8C;font-weight:800">Jij ving er</b><span>${esc(jij)}</span></div>
     </div>
+    ${vangstenHtml}
     <button data-click="${plusId}" style="width:100%;background:#F0A81E;border:0;color:#123A3F;border-radius:18px;padding:18px;font-weight:800;font-size:18px;box-shadow:0 4px 0 #C88A12;margin-bottom:10px">Ik heb er één gevangen!</button>
   </div>`;
 }

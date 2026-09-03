@@ -452,6 +452,11 @@ function renderHeaderKop(titel, ondertitel, extraHtml){
     ${extraHtml || ''}
   </div>`;
 }
+function headerTellers(items){
+  return `<div style="position:relative;display:flex;gap:8px;margin-top:14px">
+    ${items.map(([waarde, label]) => `<div style="flex:1;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 8px;text-align:center"><strong style="display:block;font-size:22px;font-weight:800;line-height:1;color:#fff">${waarde}</strong><span style="font-size:12px;color:rgba(255,255,255,.75)">${esc(label)}</span></div>`).join('')}
+  </div>`;
+}
 
 /* ---------- render: verzameling ---------- */
 function renderVerzameling(){
@@ -502,11 +507,11 @@ function renderVerzameling(){
     } catch (err) { window.alert('Kon dit back-upbestand niet lezen.'); }
   });
 
-  const statsHtml = `<div style="position:relative;display:flex;gap:8px;margin-top:14px">
-    <div style="flex:1;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 8px;text-align:center"><strong style="display:block;font-size:22px;font-weight:800;line-height:1;color:#fff">${totVissen}</strong><span style="font-size:12px;color:rgba(255,255,255,.75)">vissen</span></div>
-    <div style="flex:1;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 8px;text-align:center"><strong style="display:block;font-size:22px;font-weight:800;line-height:1;color:#fff">${soortenLijst.length}/12</strong><span style="font-size:12px;color:rgba(255,255,255,.75)">soorten</span></div>
-    <div style="flex:1;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 8px;text-align:center"><strong style="display:block;font-size:22px;font-weight:800;line-height:1;color:#fff">${beste ? dagTel[beste] : 0}</strong><span style="font-size:12px;color:rgba(255,255,255,.75)">beste dag</span></div>
-  </div>`;
+  const statsHtml = headerTellers([
+    [totVissen, 'vissen'],
+    [soortenLijst.length + '/12', 'soorten'],
+    [beste ? dagTel[beste] : 0, 'beste dag']
+  ]);
 
   return `<div>
     ${renderHeaderKop('Verzameling van ' + ikNu.naam, soortTekst, statsHtml)}
@@ -551,8 +556,15 @@ function renderDagen(){
       </button>`;
     }).join('');
 
+  const besteDag = dagenKeys.reduce((a, d) => Math.max(a, dagTel[d]), 0);
+  const dagenStats = headerTellers([
+    [dagenKeys.length, dagenKeys.length === 1 ? 'visdag' : 'visdagen'],
+    [eigen.length, 'vissen'],
+    [besteDag, 'beste dag']
+  ]);
+
   return `<div>
-    ${renderHeaderKop('Visdagen', 'Elke dag dat ' + ikNu.naam + ' heeft gevist.')}
+    ${renderHeaderKop('Visdagen', 'Elke dag dat ' + ikNu.naam + ' heeft gevist.', dagenStats)}
     ${dagenHtml}
   </div>`;
 }
@@ -561,6 +573,14 @@ function renderDagen(){
 function renderPlekken(){
   const ikNu = state.vissers.find(x => x.id === state.actief) || state.vissers[0] || { naam: '' };
   const eigen = state.vangsten.filter(v => (v.visser || 'v1') === state.actief);
+
+  const perPlekTel = {};
+  eigen.forEach(v => { if (v.plekId) perPlekTel[v.plekId] = (perPlekTel[v.plekId] || 0) + 1; });
+  const plekkenStats = headerTellers([
+    [state.plekken.length, state.plekken.length === 1 ? 'plek' : 'plekken'],
+    [eigen.filter(v => v.plekId).length, 'vissen'],
+    [Object.values(perPlekTel).reduce((a, n) => Math.max(a, n), 0), 'beste plek']
+  ]);
 
   const kaart = kaartje(state.plekken, eigen);
   const kaartHtml = kaart ? `<div style="background:#fff;border-radius:18px;padding:10px;margin-bottom:10px;box-shadow:0 3px 0 #CBDCD9">${kaart}</div>` : '';
@@ -602,7 +622,7 @@ function renderPlekken(){
     }).join('');
 
   return `<div>
-    ${renderHeaderKop('Visplekken', 'Sta je vlak bij een plek die je al kent, dan gebruikt de app die plek weer.')}
+    ${renderHeaderKop('Visplekken', 'Sta je vlak bij een plek die je al kent, dan gebruikt de app die plek weer.', plekkenStats)}
     ${kaartHtml}
     ${plekLijst}
   </div>`;

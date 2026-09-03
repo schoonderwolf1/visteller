@@ -5,7 +5,7 @@ const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 11;
+const APP_VERSIE = 12;
 const root = document.getElementById('app');
 
 const state = {
@@ -93,40 +93,30 @@ function speelVisUit(f){
   } catch (e) { terugval(); }
 }
 
-function kaartje(plekken, eigen, minSpan){
+function kaartje(plekken, eigen){
   const metGps = plekken.filter(p => p.lat != null);
   if (!metGps.length) return null;
-  const W = 520, H = 300, pad = 52;
-  const lats = metGps.map(p => p.lat);
-  const midLat = (Math.min.apply(null, lats) + Math.max.apply(null, lats)) / 2;
-  const mLat = 110540, mLon = 111320 * Math.cos(midLat * Math.PI / 180);
-  const xs = metGps.map(p => p.lon * mLon), ys = metGps.map(p => -p.lat * mLat);
-  const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
-  const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
-  const span = Math.max(maxX - minX, maxY - minY, minSpan || 140);
-  const sc = Math.min((W - pad * 2) / span, (H - pad * 2) / span);
-  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const W = NL_KAART.W, H = NL_KAART.H;
   let stip = '';
   metGps.forEach(p => {
-    const x = W / 2 + (p.lon * mLon - cx) * sc, y = H / 2 + (-p.lat * mLat - cy) * sc;
+    let [x, y] = nlProjecteer(p.lon, p.lat);
+    x = Math.min(Math.max(x, 10), W - 10);
+    y = Math.min(Math.max(y, 10), H - 10);
     const tel = eigen.filter(v => v.plekId === p.id).length;
-    const lx = Math.min(Math.max(x, 58), W - 58);
-    stip += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="17" fill="#2F7D4F" fill-opacity=".18"/>`
-      + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" fill="#2F7D4F" stroke="#fff" stroke-width="3"/>`
-      + `<text x="${x.toFixed(1)}" y="${(y + 4.5).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${tel > 99 ? 99 : tel}</text>`
-      + `<text x="${lx.toFixed(1)}" y="${(y + 34).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#134A52">${esc(p.naam)}</text>`;
+    const lx = Math.min(Math.max(x, 62), W - 62);
+    const ly = y > H - 40 ? y - 22 : y + 30;
+    stip += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="15" fill="#2F7D4F" fill-opacity=".2"/>`
+      + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10" fill="#2F7D4F" stroke="#fff" stroke-width="3"/>`
+      + `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="800" fill="#fff">${tel > 99 ? 99 : tel}</text>`
+      + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="14" font-weight="800" fill="#134A52">${esc(p.naam)}</text>`;
   });
-  const stapjes = [25, 50, 100, 250, 500, 1000, 2500];
-  let barM = stapjes[0];
-  stapjes.forEach(s => { if (s * sc <= W * 0.34) barM = s; });
-  const barPx = barM * sc;
-  return `<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto" role="img" aria-label="Kaartje van je visplekken">`
-    + `<rect x="0" y="0" width="${W}" height="${H}" rx="20" fill="#DBEAE6"/>`
-    + `<path d="M0,84 C120,58 190,112 300,88 C390,68 460,96 520,80" fill="none" stroke="#C3DAD4" stroke-width="16" stroke-linecap="round"/>`
-    + `<path d="M0,206 C110,232 200,178 310,204 C400,226 470,196 520,212" fill="none" stroke="#C3DAD4" stroke-width="22" stroke-linecap="round"/>`
+  const barKm = 50, barPx = barKm * NL_KAART.schaal;
+  return `<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;max-width:300px;height:auto;margin:0 auto" role="img" aria-label="Kaart van Nederland met je visplekken">`
+    + `<rect x="0" y="0" width="${W}" height="${H}" rx="20" fill="#CFE4EC"/>`
+    + `<path d="${NL_PAD}" fill="#DCEFE4" stroke="#9FC7B4" stroke-width="1.5"/>`
     + stip
-    + `<g transform="translate(20,${H - 22})"><rect x="0" y="-7" width="${barPx.toFixed(1)}" height="5" rx="2.5" fill="#134A52" fill-opacity=".55"/>`
-    + `<text x="0" y="10" font-size="13" font-weight="700" fill="#4E7276">${barM} m</text></g></svg>`;
+    + `<g transform="translate(16,${H - 18})"><rect x="0" y="-6" width="${barPx.toFixed(1)}" height="4" rx="2" fill="#134A52" fill-opacity=".55"/>`
+    + `<text x="0" y="9" font-size="12" font-weight="700" fill="#4E7276">${barKm} km</text></g></svg>`;
 }
 
 function laadPlaatje(src){
@@ -693,7 +683,7 @@ function renderPlek(){
   const per = {}; vs.forEach(v => { per[v.soort] = (per[v.soort] || 0) + 1; });
   const dgn = {}; vs.forEach(v => { dgn[v.datum] = (dgn[v.datum] || 0) + 1; });
   const dagKeys = Object.keys(dgn).sort().reverse();
-  const pk = kaartje([po], eigen, 120);
+  const pk = kaartje([po], eigen);
   const kaartUrl = po.lat != null ? `https://www.google.com/maps/search/?api=1&query=${po.lat},${po.lon}` : null;
 
   const terugId = on(() => setUi({ tab: 'plekken', plekOpen: null }));

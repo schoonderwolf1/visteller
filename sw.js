@@ -1,11 +1,12 @@
 /* Visteller service worker — app blijft werken zonder internet.
    HTML en scripts: netwerk eerst (zodat updates altijd doorkomen),
    met de cache als terugval. Overige bestanden: cache eerst. */
-const CACHE = 'visteller-v3';
+const CACHE = 'visteller-v4';
 const SHELL = [
   './',
   './index.html',
   './fish.js',
+  './nl.js',
   './db.js',
   './app.js',
   './manifest.webmanifest',

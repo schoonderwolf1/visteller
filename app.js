@@ -478,6 +478,18 @@ function renderDagen(){
       </button>`;
     }).join('');
 
+  return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
+    <h1 style="font-size:24px;font-weight:800;margin:0 0 2px">Visdagen</h1>
+    <p style="font-size:15px;color:#6E8A8C;margin:0 0 16px">Elke dag dat ${esc(ikNu.naam)} heeft gevist.</p>
+    ${dagenHtml}
+  </div>`;
+}
+
+/* ---------- render: plekken ---------- */
+function renderPlekken(){
+  const ikNu = state.vissers.find(x => x.id === state.actief) || state.vissers[0] || { naam: '' };
+  const eigen = state.vangsten.filter(v => (v.visser || 'v1') === state.actief);
+
   const kaart = kaartje(state.plekken, eigen);
   const kaartHtml = kaart ? `<div style="background:#fff;border-radius:18px;padding:10px;margin-bottom:10px;box-shadow:0 3px 0 #CBDCD9">${kaart}</div>` : '';
 
@@ -518,11 +530,8 @@ function renderDagen(){
     }).join('');
 
   return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
-    <h1 style="font-size:24px;font-weight:800;margin:0 0 2px">Visdagen</h1>
-    <p style="font-size:15px;color:#6E8A8C;margin:0 0 16px">Elke dag dat ${esc(ikNu.naam)} heeft gevist.</p>
-    ${dagenHtml}
-    <h3 style="font-size:17px;font-weight:800;margin:24px 0 4px">Mijn visplekken</h3>
-    <p style="font-size:14px;color:#6E8A8C;margin:0 0 12px">Sta je vlak bij een plek die je al kent, dan gebruikt de app die plek weer.</p>
+    <h1 style="font-size:24px;font-weight:800;margin:0 0 2px">Visplekken</h1>
+    <p style="font-size:15px;color:#6E8A8C;margin:0 0 16px">Sta je vlak bij een plek die je al kent, dan gebruikt de app die plek weer.</p>
     ${kaartHtml}
     ${plekLijst}
   </div>`;
@@ -569,14 +578,14 @@ function renderDag(){
 function renderPlek(){
   const eigen = state.vangsten.filter(v => (v.visser || 'v1') === state.actief);
   const po = state.plekOpen ? state.plekken.find(p => p.id === state.plekOpen) : null;
-  if (!po) return renderDagen();
+  if (!po) return renderPlekken();
   const vs = eigen.filter(v => v.plekId === po.id).slice().sort((a, b) => b.ts - a.ts);
   const per = {}; vs.forEach(v => { per[v.soort] = (per[v.soort] || 0) + 1; });
   const dgn = {}; vs.forEach(v => { dgn[v.datum] = (dgn[v.datum] || 0) + 1; });
   const dagKeys = Object.keys(dgn).sort().reverse();
   const pk = kaartje([po], eigen, 120);
 
-  const terugId = on(() => setUi({ tab: 'dagen', plekOpen: null }));
+  const terugId = on(() => setUi({ tab: 'plekken', plekOpen: null }));
   const fotoId = on(e => plekFoto(po.id, e));
   const hernoemId = on(() => hernoemPlek(po));
 
@@ -765,14 +774,17 @@ function renderDiploma(){
 function renderNav(){
   const vangenActief = state.tab === 'vangen' || state.tab === 'info';
   const verzActief = state.tab === 'verzameling';
-  const dagenActief = state.tab === 'dagen' || state.tab === 'dag' || state.tab === 'plek';
+  const dagenActief = state.tab === 'dagen' || state.tab === 'dag';
+  const plekkenActief = state.tab === 'plekken' || state.tab === 'plek';
   const vangenId = on(() => setUi({ tab: 'vangen' }));
   const verzId = on(() => setUi({ tab: 'verzameling' }));
-  const dagenId = on(() => setUi({ tab: 'dagen', dagOpen: null, plekOpen: null }));
+  const dagenId = on(() => setUi({ tab: 'dagen', dagOpen: null }));
+  const plekkenId = on(() => setUi({ tab: 'plekken', plekOpen: null }));
   return `<nav style="position:fixed;left:0;right:0;bottom:0;display:flex;background:#fff;border-top:2px solid #CBDCD9;padding-bottom:env(safe-area-inset-bottom);z-index:20">
     <button data-click="${vangenId}" style="flex:1;background:none;border:0;padding:12px 4px 14px;font-weight:800;font-size:14px;color:${vangenActief ? '#123A3F' : '#6E8A8C'};display:grid;gap:6px;justify-items:center"><span style="width:24px;height:4px;border-radius:3px;background:${vangenActief ? '#F0A81E' : 'transparent'}"></span>Vangen</button>
     <button data-click="${verzId}" style="flex:1;background:none;border:0;padding:12px 4px 14px;font-weight:800;font-size:14px;color:${verzActief ? '#123A3F' : '#6E8A8C'};display:grid;gap:6px;justify-items:center"><span style="width:24px;height:4px;border-radius:3px;background:${verzActief ? '#F0A81E' : 'transparent'}"></span>Verzameling</button>
     <button data-click="${dagenId}" style="flex:1;background:none;border:0;padding:12px 4px 14px;font-weight:800;font-size:14px;color:${dagenActief ? '#123A3F' : '#6E8A8C'};display:grid;gap:6px;justify-items:center"><span style="width:24px;height:4px;border-radius:3px;background:${dagenActief ? '#F0A81E' : 'transparent'}"></span>Dagen</button>
+    <button data-click="${plekkenId}" style="flex:1;background:none;border:0;padding:12px 4px 14px;font-weight:800;font-size:14px;color:${plekkenActief ? '#123A3F' : '#6E8A8C'};display:grid;gap:6px;justify-items:center"><span style="width:24px;height:4px;border-radius:3px;background:${plekkenActief ? '#F0A81E' : 'transparent'}"></span>Plekken</button>
   </nav>`;
 }
 
@@ -785,6 +797,7 @@ function render(){
   else if (state.tab === 'verzameling') body = renderVerzameling();
   else if (state.tab === 'dagen') body = renderDagen();
   else if (state.tab === 'dag') body = renderDag();
+  else if (state.tab === 'plekken') body = renderPlekken();
   else if (state.tab === 'plek') body = renderPlek();
   else if (state.tab === 'info') body = renderInfo();
   else body = renderVangen();

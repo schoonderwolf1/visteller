@@ -5,7 +5,7 @@ const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 12;
+const APP_VERSIE = 13;
 const root = document.getElementById('app');
 
 const state = {
@@ -762,12 +762,16 @@ function renderInfo(){
   const vangstenHtml = vangstenVanSoort.length ? `<div style="margin-bottom:14px">
     <h3 style="font-size:17px;font-weight:800;margin:0 0 10px">Al mijn vangsten van deze soort</h3>
     ${vangstenVanSoort.map(v => {
+      const openId = on(() => setUi({ tab: 'dag', dagOpen: v.datum }));
       const diplomaId = on(() => deelDiploma(v));
       const t = new Date(v.ts);
       const p = state.plekken.find(x => x.id === v.plekId);
       const regel = [v.lengte ? v.lengte + ' cm' : null, p ? p.naam : null, String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')].filter(Boolean).join(' · ');
       return `<div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:10px 12px;margin-bottom:8px;box-shadow:0 2px 0 #CBDCD9">
-        <span style="flex:1;min-width:0"><span style="display:block;font-size:16px;font-weight:800">${esc(langeDag(v.datum))}</span><span style="display:block;font-size:13px;color:#6E8A8C">${esc(regel)}</span></span>
+        <button data-click="${openId}" style="all:unset;flex:1;min-width:0;cursor:pointer">
+          <span style="display:block;font-size:16px;font-weight:800">${esc(langeDag(v.datum))}${v.foto ? ' 📷' : ''}</span>
+          <span style="display:block;font-size:13px;color:#6E8A8C">${esc(regel)}</span>
+        </button>
         <button data-click="${diplomaId}" style="flex:none;background:#F4F8F7;border:2px solid #CBDCD9;color:#17545C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:800">Diploma</button>
       </div>`;
     }).join('')}

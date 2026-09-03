@@ -7,7 +7,7 @@ const state = {
   tab: 'vangen', datum: vandaagStr(), vangsten: [], plekken: [],
   vissers: [{ id: 'v1', naam: 'Ik' }, { id: 'v2', naam: 'Papa' }], actief: 'v1',
   sheet: null, info: null, dagOpen: null, plekOpen: null, diploma: null,
-  geladen: false
+  geladen: false, weergave: 'tekening'
 };
 
 let registry = {};
@@ -28,7 +28,7 @@ function commit(patch){
   render();
   bewaarStaat({
     vangsten: state.vangsten, plekken: state.plekken,
-    vissers: state.vissers, actief: state.actief
+    vissers: state.vissers, actief: state.actief, weergave: state.weergave
   });
 }
 
@@ -303,13 +303,20 @@ function renderVangen(){
   const datumId = on(e => { if (e.target.value) setUi({ datum: e.target.value }); });
   const vandaagId = on(() => setUi({ datum: vandaag }));
 
+  const alsFoto = state.weergave === 'foto';
+  const kiesTekeningId = on(() => commit({ weergave: 'tekening' }));
+  const kiesFotoId = on(() => commit({ weergave: 'foto' }));
+
   const kaarten = VISSEN.map((f, i) => {
     const n = perSoortDag[f.n] || 0;
     const tikId = on(() => openSheet(f.n));
     const infoId = on(e => { e.stopPropagation(); setUi({ info: f.n, tab: 'info' }); });
+    const beeld = (alsFoto && f.foto)
+      ? `<img src="${f.foto}" alt="Foto van een ${esc(f.n).toLowerCase()}" style="display:block;width:100%;height:78px;object-fit:cover;border-radius:14px">`
+      : svgVoor(f, i, 'k');
     return `<div style="position:relative">
       <button data-click="${tikId}" style="all:unset;display:block;width:100%;box-sizing:border-box;background:#fff;border:3px solid ${n ? '#F0A81E' : '#ffffff'};border-radius:22px;padding:12px 8px 10px;text-align:center;box-shadow:0 3px 0 #CBDCD9">
-        <span style="display:grid;place-items:center;width:100%;height:78px;min-height:0;overflow:hidden">${svgVoor(f, i, 'k')}</span>
+        <span style="display:grid;place-items:center;width:100%;height:78px;min-height:0;overflow:hidden">${beeld}</span>
         <span style="display:block;font-size:16px;font-weight:800;margin-top:6px;color:#123A3F">${esc(f.n)}</span>
       </button>
       ${n ? `<span style="position:absolute;top:-7px;left:-7px;min-width:34px;height:34px;padding:0 8px;border-radius:17px;background:#F0A81E;color:#123A3F;font-size:18px;font-weight:800;display:grid;place-items:center;box-shadow:0 2px 0 #C88A12">${n}</span>` : ''}
@@ -352,6 +359,11 @@ function renderVangen(){
 
     <h2 style="font-size:20px;font-weight:800;margin:0 0 2px">Wat heb je gevangen?</h2>
     <p style="font-size:15px;color:#6E8A8C;margin:0 0 12px;line-height:1.4">Tik op de vis die je ving. Tik op het vraagteken om hem eerst goed te bekijken.</p>
+
+    <div style="display:flex;gap:6px;background:#fff;border:2px solid #CBDCD9;border-radius:16px;padding:5px;margin-bottom:14px">
+      <button data-click="${kiesTekeningId}" style="flex:1;background:${alsFoto ? 'transparent' : '#1E7A8C'};border:0;color:${alsFoto ? '#6E8A8C' : '#ffffff'};border-radius:12px;padding:11px 8px;font-size:15px;font-weight:800">Tekening</button>
+      <button data-click="${kiesFotoId}" style="flex:1;background:${alsFoto ? '#1E7A8C' : 'transparent'};border:0;color:${alsFoto ? '#ffffff' : '#6E8A8C'};border-radius:12px;padding:11px 8px;font-size:15px;font-weight:800">Foto</button>
+    </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${kaarten}</div>
     ${vandaagLijst}
@@ -625,7 +637,9 @@ function renderInfo(){
   return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
     <button data-click="${terugId}" style="background:none;border:0;color:#6E8A8C;font-size:15px;font-weight:800;padding:6px 0;margin-bottom:6px">‹ Terug</button>
     <div style="background:#fff;border-radius:24px;padding:16px;box-shadow:0 3px 0 #CBDCD9;margin-bottom:14px">
-      <div style="display:block;width:100%;height:230px;margin-bottom:12px;display:grid;place-items:center">${svgVoor(f, i, 'i')}</div>
+      ${f.foto
+        ? `<img src="${f.foto}" alt="Foto van een ${esc(f.n).toLowerCase()}" style="display:block;width:100%;height:230px;object-fit:cover;border-radius:16px;margin-bottom:12px">`
+        : `<div style="display:block;width:100%;height:230px;margin-bottom:12px;display:grid;place-items:center">${svgVoor(f, i, 'i')}</div>`}
       <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:14px">
         <div style="flex:1;min-width:0"><h1 style="font-size:28px;font-weight:800;margin:0">${esc(f.n)}</h1><p style="font-size:14px;color:#6E8A8C;margin:0;font-style:italic">${esc(f.lat)}</p></div>
         ${kanVoorlezen ? `<button data-click="${voorleesId}" aria-label="Lees voor" style="flex:none;display:flex;align-items:center;gap:8px;background:#1E7A8C;border:0;color:#fff;border-radius:16px;padding:12px 16px;font-size:15px;font-weight:800;box-shadow:0 3px 0 #17545C"><span style="display:block;width:0;height:0;border-left:12px solid #fff;border-top:8px solid transparent;border-bottom:8px solid transparent"></span>Voorlezen</button>` : ''}
@@ -792,6 +806,7 @@ async function init(){
     state.plekken = saved.plekken || [];
     if (saved.vissers && saved.vissers.length) state.vissers = saved.vissers;
     if (saved.actief) state.actief = saved.actief;
+    if (saved.weergave) state.weergave = saved.weergave;
   }
   state.geladen = true;
   render();

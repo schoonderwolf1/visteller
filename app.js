@@ -45,22 +45,29 @@ function hernoemVisser(v){
   commit({ vissers: state.vissers.map(x => x.id === v.id ? { ...x, naam: t } : x) });
 }
 
+/* Chrome/Android kan de utterance weggooien als er nergens meer naar
+   verwezen wordt vlak voordat hij afspeelt — daarom hier bewaard. */
+let laatsteUtterance = null;
+
 function voorlezen(tekst){
   try {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(tekst);
     u.lang = 'nl-NL'; u.rate = .9; u.pitch = 1.05;
-    let stemmen = window.speechSynthesis.getVoices();
-    if (!stemmen.length) {
-      window.speechSynthesis.addEventListener('voiceschanged', () => voorlezen(tekst), { once: true });
-      return;
+    /* Meteen afspelen, ook als de stemmenlijst nog leeg is: op Android is die
+       vaak pas na een (asynchrone) 'voiceschanged' beschikbaar, en wachten
+       daarop zou hier betekenen dat speak() niet meer binnen de directe
+       tik van de gebruiker valt — mobiele browsers negeren dat dan stil. */
+    const stemmen = window.speechSynthesis.getVoices();
+    if (stemmen.length) {
+      const nl = stemmen.filter(s => /^nl/i.test(s.lang));
+      const vrouw = /female|vrouw|woman|lotte|ellen|fenna|laura|claire|nl-NL-Standard-A|nl-NL-Wavenet-A|nl-nl-x-dma|google nederlands/i;
+      const isVrouw = s => vrouw.test(s.name) && !/xander|male\b/i.test(s.name);
+      const stem = nl.find(isVrouw) || nl.find(s => !/xander|male\b/i.test(s.name)) || nl[0];
+      if (stem) u.voice = stem;
     }
-    const nl = stemmen.filter(s => /^nl/i.test(s.lang));
-    const vrouw = /female|vrouw|woman|lotte|ellen|fenna|laura|claire|nl-NL-Standard-A|nl-NL-Wavenet-A|nl-nl-x-dma|google nederlands/i;
-    const isVrouw = s => vrouw.test(s.name) && !/xander|male\b/i.test(s.name);
-    const stem = nl.find(isVrouw) || nl.find(s => !/xander|male\b/i.test(s.name)) || nl[0];
-    if (stem) u.voice = stem;
+    laatsteUtterance = u;
     window.speechSynthesis.speak(u);
   } catch (e) {}
 }
@@ -825,6 +832,7 @@ document.addEventListener('input', e => {
 /* ---------- opstarten ---------- */
 async function init(){
   vraagBlijvendeOpslag();
+  if (window.speechSynthesis) window.speechSynthesis.getVoices();
   const saved = await laadStaat();
   if (saved) {
     state.vangsten = saved.vangsten || [];

@@ -1,0 +1,17 @@
+{
+  "name": "Visteller",
+  "short_name": "Visteller",
+  "description": "Vink aan welke vis je hebt gevangen en bewaar je visdagen en visplekken.",
+  "lang": "nl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#E9F3EF",
+  "theme_color": "#17545C",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

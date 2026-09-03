@@ -7,7 +7,7 @@ const state = {
   tab: 'vangen', datum: vandaagStr(), vangsten: [], plekken: [],
   vissers: [{ id: 'v1', naam: 'Ik' }, { id: 'v2', naam: 'Papa' }], actief: 'v1',
   sheet: null, info: null, dagOpen: null, plekOpen: null, diploma: null,
-  geladen: false, weergave: 'tekening'
+  geladen: false, weergave: 'tekening', badgeOpen: null
 };
 
 let registry = {};
@@ -186,6 +186,55 @@ async function deelDiploma(v){
     const file = new File([blob], naam, { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: 'Mijn vangst' }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = naam; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (e) {}
+}
+
+function regelsBreken(c, tekst, x, y, maxBreedte, regelHoogte){
+  const woorden = tekst.split(' ');
+  let regel = '', regels = [];
+  woorden.forEach(w => {
+    const proef = regel ? regel + ' ' + w : w;
+    if (c.measureText(proef).width > maxBreedte && regel) { regels.push(regel); regel = w; }
+    else regel = proef;
+  });
+  if (regel) regels.push(regel);
+  const start = y - (regels.length - 1) * regelHoogte / 2;
+  regels.forEach((r, i) => c.fillText(r, x, start + i * regelHoogte));
+}
+
+async function badgeCanvasMaken(b){
+  const W = 800, H = 800, g = document.createElement('canvas');
+  g.width = W; g.height = H;
+  const c = g.getContext('2d');
+  try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+  const grd = c.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#1E7A8C'); grd.addColorStop(1, '#123F49');
+  c.fillStyle = grd; c.fillRect(0, 0, W, H);
+  c.textAlign = 'center';
+  c.fillStyle = 'rgba(255,255,255,.75)'; c.font = '700 26px "Baloo 2", sans-serif';
+  c.fillText('VISTELLER · STICKER', W / 2, 100);
+  c.beginPath(); c.arc(W / 2, 350, 170, 0, Math.PI * 2); c.fillStyle = b.kl; c.fill();
+  c.fillStyle = '#fff'; c.font = '800 130px "Baloo 2", sans-serif';
+  c.fillText(b.teken, W / 2, 392);
+  c.fillStyle = '#fff'; c.font = '800 52px "Baloo 2", sans-serif';
+  regelsBreken(c, b.label, W / 2, 580, W - 160, 62);
+  return g;
+}
+
+async function deelBadge(b){
+  try {
+    const canvas = await badgeCanvasMaken(b);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    if (!blob) return;
+    const naam = 'visteller-sticker-' + b.id + '.png';
+    const file = new File([blob], naam, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: 'Mijn sticker' }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
     }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -391,6 +440,19 @@ function regelVan(v){
   return d.join(' · ');
 }
 
+/* ---------- gedeelde header (zelfde stijl als het Vangen-scherm) ---------- */
+function renderHeaderKop(titel, ondertitel, extraHtml){
+  return `<div style="background:linear-gradient(160deg,#1E7A8C 0%,#17545C 60%,#134A52 100%);border-radius:0 0 26px 26px;margin:0 -14px 18px;padding:calc(env(safe-area-inset-top) + 18px) 18px 20px;color:#fff;position:relative;overflow:hidden">
+    <div style="position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.06)"></div>
+    <div style="position:relative">
+      <div style="font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.7">Visteller</div>
+      <div style="font-size:22px;font-weight:800;line-height:1.15;margin-top:2px">${esc(titel)}</div>
+      ${ondertitel ? `<div style="font-size:15px;opacity:.85;margin-top:4px;line-height:1.35">${esc(ondertitel)}</div>` : ''}
+    </div>
+    ${extraHtml || ''}
+  </div>`;
+}
+
 /* ---------- render: verzameling ---------- */
 function renderVerzameling(){
   const ikNu = state.vissers.find(x => x.id === state.actief) || state.vissers[0] || { naam: '' };
@@ -415,10 +477,14 @@ function renderVerzameling(){
   }).join('');
 
   const uit = badgesUit(eigen, state.plekken);
-  const badges = BADGES.map(b => `<div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:10px;box-shadow:0 2px 0 #CBDCD9;opacity:${uit[b.id] ? 1 : .6}">
-    <span style="flex:none;width:44px;height:44px;border-radius:50%;background:${uit[b.id] ? b.kl : '#CBDCD9'};color:#fff;display:grid;place-items:center;font-size:17px;font-weight:800;line-height:1">${b.teken}</span>
-    <span style="font-size:14px;font-weight:700;line-height:1.25;color:${uit[b.id] ? '#123A3F' : '#8AA3A4'}">${esc(b.label)}</span>
-  </div>`).join('');
+  const badges = BADGES.map(b => {
+    const verdiend = !!uit[b.id];
+    const inhoud = `<span style="flex:none;width:44px;height:44px;border-radius:50%;background:${verdiend ? b.kl : '#CBDCD9'};color:#fff;display:grid;place-items:center;font-size:17px;font-weight:800;line-height:1">${b.teken}</span>
+    <span style="font-size:14px;font-weight:700;line-height:1.25;color:${verdiend ? '#123A3F' : '#8AA3A4'}">${esc(b.label)}</span>`;
+    if (!verdiend) return `<div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:10px;box-shadow:0 2px 0 #CBDCD9;opacity:.6">${inhoud}</div>`;
+    const id = on(() => setUi({ badgeOpen: b.id }));
+    return `<button data-click="${id}" style="all:unset;display:flex;box-sizing:border-box;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:10px;box-shadow:0 2px 0 #CBDCD9;cursor:pointer">${inhoud}</button>`;
+  }).join('');
 
   const wisId = on(wisAlles);
   const exportId = on(() => exporteerBackup());
@@ -436,14 +502,14 @@ function renderVerzameling(){
     } catch (err) { window.alert('Kon dit back-upbestand niet lezen.'); }
   });
 
-  return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
-    <h1 style="font-size:24px;font-weight:800;margin:0 0 2px">Verzameling van ${esc(ikNu.naam)}</h1>
-    <p style="font-size:15px;color:#6E8A8C;margin:0 0 16px">${esc(soortTekst)}</p>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px">
-      <div style="background:#fff;border-radius:18px;padding:14px 8px;text-align:center;box-shadow:0 3px 0 #CBDCD9"><strong style="display:block;font-size:28px;font-weight:800;line-height:1">${totVissen}</strong><span style="font-size:13px;color:#6E8A8C">vissen</span></div>
-      <div style="background:#fff;border-radius:18px;padding:14px 8px;text-align:center;box-shadow:0 3px 0 #CBDCD9"><strong style="display:block;font-size:28px;font-weight:800;line-height:1">${soortenLijst.length}/12</strong><span style="font-size:13px;color:#6E8A8C">soorten</span></div>
-      <div style="background:#fff;border-radius:18px;padding:14px 8px;text-align:center;box-shadow:0 3px 0 #CBDCD9"><strong style="display:block;font-size:28px;font-weight:800;line-height:1">${beste ? dagTel[beste] : 0}</strong><span style="font-size:13px;color:#6E8A8C">beste dag</span></div>
-    </div>
+  const statsHtml = `<div style="position:relative;display:flex;gap:8px;margin-top:14px">
+    <div style="flex:1;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 8px;text-align:center"><strong style="display:block;font-size:22px;font-weight:800;line-height:1;color:#fff">${totVissen}</strong><span style="font-size:12px;color:rgba(255,255,255,.75)">vissen</span></div>
+    <div style="flex:1;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 8px;text-align:center"><strong style="display:block;font-size:22px;font-weight:800;line-height:1;color:#fff">${soortenLijst.length}/12</strong><span style="font-size:12px;color:rgba(255,255,255,.75)">soorten</span></div>
+    <div style="flex:1;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 8px;text-align:center"><strong style="display:block;font-size:22px;font-weight:800;line-height:1;color:#fff">${beste ? dagTel[beste] : 0}</strong><span style="font-size:12px;color:rgba(255,255,255,.75)">beste dag</span></div>
+  </div>`;
+
+  return `<div>
+    ${renderHeaderKop('Verzameling van ' + ikNu.naam, soortTekst, statsHtml)}
     <h3 style="font-size:17px;font-weight:800;margin:0 0 4px">Verzamelkaart</h3>
     <p style="font-size:14px;color:#6E8A8C;margin:0 0 12px">Grijze vissen heb je nog nooit gevangen.</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:26px">${verzamel}</div>
@@ -485,9 +551,8 @@ function renderDagen(){
       </button>`;
     }).join('');
 
-  return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
-    <h1 style="font-size:24px;font-weight:800;margin:0 0 2px">Visdagen</h1>
-    <p style="font-size:15px;color:#6E8A8C;margin:0 0 16px">Elke dag dat ${esc(ikNu.naam)} heeft gevist.</p>
+  return `<div>
+    ${renderHeaderKop('Visdagen', 'Elke dag dat ' + ikNu.naam + ' heeft gevist.')}
     ${dagenHtml}
   </div>`;
 }
@@ -528,7 +593,7 @@ function renderPlekken(){
           </button>
           <label style="flex:none;position:relative;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700">
             ${p.foto ? 'Foto ✓' : 'Foto'}
-            <input type="file" accept="image/*" capture="environment" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
+            <input type="file" accept="image/*" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
           </label>
           <button data-click="${hernoemId}" style="flex:none;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700">Naam</button>
         </div>
@@ -536,9 +601,8 @@ function renderPlekken(){
       </div>`;
     }).join('');
 
-  return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
-    <h1 style="font-size:24px;font-weight:800;margin:0 0 2px">Visplekken</h1>
-    <p style="font-size:15px;color:#6E8A8C;margin:0 0 16px">Sta je vlak bij een plek die je al kent, dan gebruikt de app die plek weer.</p>
+  return `<div>
+    ${renderHeaderKop('Visplekken', 'Sta je vlak bij een plek die je al kent, dan gebruikt de app die plek weer.')}
     ${kaartHtml}
     ${plekLijst}
   </div>`;
@@ -566,7 +630,7 @@ function renderDag(){
       <div style="display:flex;gap:8px;margin-top:8px">
         <label style="flex:1;position:relative;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700;text-align:center">
           ${v.foto ? 'Andere foto' : 'Foto toevoegen'}
-          <input type="file" accept="image/*" capture="environment" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
+          <input type="file" accept="image/*" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
         </label>
         <button data-click="${diplomaId}" style="flex:1;background:#F4F8F7;border:2px solid #CBDCD9;color:#17545C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:800">Diploma</button>
       </div>
@@ -591,6 +655,7 @@ function renderPlek(){
   const dgn = {}; vs.forEach(v => { dgn[v.datum] = (dgn[v.datum] || 0) + 1; });
   const dagKeys = Object.keys(dgn).sort().reverse();
   const pk = kaartje([po], eigen, 120);
+  const kaartUrl = po.lat != null ? `https://www.google.com/maps/search/?api=1&query=${po.lat},${po.lon}` : null;
 
   const terugId = on(() => setUi({ tab: 'plekken', plekOpen: null }));
   const fotoId = on(e => plekFoto(po.id, e));
@@ -633,11 +698,12 @@ function renderPlek(){
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <label style="flex:1;position:relative;background:#fff;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:14px;padding:12px;font-size:14px;font-weight:700;text-align:center">
         ${po.foto ? 'Andere foto' : 'Foto van deze plek'}
-        <input type="file" accept="image/*" capture="environment" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
+        <input type="file" accept="image/*" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
       </label>
       <button data-click="${hernoemId}" style="flex:none;background:#fff;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:14px;padding:12px 18px;font-size:14px;font-weight:700">Naam</button>
     </div>
-    ${pk ? `<div style="background:#fff;border-radius:18px;padding:10px;margin-bottom:14px;box-shadow:0 3px 0 #CBDCD9">${pk}</div>` : ''}
+    ${pk ? `<div style="background:#fff;border-radius:18px;padding:10px;margin-bottom:10px;box-shadow:0 3px 0 #CBDCD9">${pk}</div>` : ''}
+    ${kaartUrl ? `<a href="${kaartUrl}" target="_blank" rel="noopener" style="display:block;text-align:center;background:#1E7A8C;color:#fff;border-radius:14px;padding:12px;font-weight:800;font-size:14px;text-decoration:none;margin-bottom:14px">Bekijk deze plek op de echte kaart</a>` : ''}
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
       <div style="background:#fff;border-radius:18px;padding:14px 8px;text-align:center;box-shadow:0 3px 0 #CBDCD9"><strong style="display:block;font-size:28px;font-weight:800;line-height:1">${vs.length}</strong><span style="font-size:13px;color:#6E8A8C">vissen</span></div>
       <div style="background:#fff;border-radius:18px;padding:14px 8px;text-align:center;box-shadow:0 3px 0 #CBDCD9"><strong style="display:block;font-size:28px;font-weight:800;line-height:1">${Object.keys(per).length}</strong><span style="font-size:13px;color:#6E8A8C">soorten</span></div>
@@ -749,7 +815,7 @@ function renderSheet(){
       <div style="display:flex;gap:8px;align-items:center">
         <label style="flex:1;position:relative;background:none;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:14px;padding:12px;font-size:14px;font-weight:700;text-align:center">
           ${s.foto ? 'Foto toegevoegd ✓' : 'Foto maken (mag ook niet)'}
-          <input type="file" accept="image/*" capture="environment" data-change="${fotoId}" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+          <input type="file" accept="image/*" data-change="${fotoId}" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
         </label>
         <button data-click="${sluitId}" style="flex:none;background:none;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:14px;padding:12px 18px;font-size:14px;font-weight:700">Stop</button>
       </div>
@@ -777,6 +843,21 @@ function renderDiploma(){
   </div>`;
 }
 
+/* ---------- render: sticker nogmaals bekijken ---------- */
+function renderBadgeScherm(){
+  const b = BADGES.find(x => x.id === state.badgeOpen);
+  if (!b) return '';
+  const deelId = on(() => deelBadge(b));
+  const sluitId = on(() => setUi({ badgeOpen: null }));
+  return `<div style="position:fixed;inset:0;z-index:60;background:linear-gradient(170deg,#1E7A8C,#134A52);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
+    <div style="font-size:14px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.75">Sticker</div>
+    <div style="width:140px;height:140px;border-radius:50%;background:${b.kl};display:grid;place-items:center;font-size:56px;font-weight:800;margin:18px 0;box-shadow:0 6px 0 rgba(0,0,0,.15)">${b.teken}</div>
+    <h1 style="font-size:26px;font-weight:800;margin:0 0 18px;line-height:1.3;max-width:320px">${esc(b.label)}</h1>
+    <button data-click="${sluitId}" style="margin-top:6px;background:#F0A81E;border:0;color:#123A3F;border-radius:18px;padding:17px 40px;font-weight:800;font-size:19px;box-shadow:0 4px 0 #C88A12">Sluiten</button>
+    <button data-click="${deelId}" style="margin-top:10px;background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.35);color:#fff;border-radius:16px;padding:13px 24px;font-weight:800;font-size:15px">Sticker bewaren of sturen</button>
+  </div>`;
+}
+
 /* ---------- render: navigatie ---------- */
 function renderNav(){
   const vangenActief = state.tab === 'vangen' || state.tab === 'info';
@@ -796,6 +877,7 @@ function renderNav(){
 }
 
 /* ---------- hoofd render ---------- */
+let laatstePagina = null;
 function render(){
   registry = {}; idc = 0;
   if (!state.geladen) { root.innerHTML = ''; return; }
@@ -812,7 +894,17 @@ function render(){
   root.innerHTML = `<div style="min-height:100dvh;background:#E9F3EF;padding-bottom:104px"><div style="max-width:560px;margin:0 auto;padding:0 14px">${body}</div></div>`
     + renderNav()
     + (state.sheet ? renderSheet() : '')
-    + (state.diploma ? renderDiploma() : '');
+    + (state.diploma ? renderDiploma() : '')
+    + (state.badgeOpen ? renderBadgeScherm() : '');
+
+  /* Bij een nieuwe "pagina" bovenaan beginnen — anders opent bv. het infoscherm
+     van een vis onderaan het scherm gewoon op de scrollpositie van de vorige
+     pagina, alsof het één lange pagina is. */
+  const huidigePagina = state.tab + '|' + (state.info || '') + '|' + (state.dagOpen || '') + '|' + (state.plekOpen || '');
+  if (huidigePagina !== laatstePagina) {
+    laatstePagina = huidigePagina;
+    window.scrollTo(0, 0);
+  }
 }
 
 /* ---------- events (event delegation, gebonden op de root) ---------- */

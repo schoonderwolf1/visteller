@@ -5,7 +5,7 @@ const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 13;
+const APP_VERSIE = 14;
 const root = document.getElementById('app');
 
 const state = {
@@ -27,7 +27,27 @@ function svgVoor(f, i, sleutel, grijs){
   return svgCache[k];
 }
 
+/* Handmatige update-check: de service worker ververst zichzelf normaal op de
+   achtergrond, maar dat kan soms lang duren voor het écht doorkomt. Tikken op
+   het versienummer forceert een directe check, zodat je niet hoeft te
+   gokken of "nog een keer sluiten en openen" al genoeg is geweest. */
+async function controleerUpdate(){
+  try {
+    if (!('serviceWorker' in navigator)) { window.location.reload(); return; }
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) { window.location.reload(); return; }
+    await reg.update();
+    window.alert('Gecontroleerd op updates. Is er een nieuwe versie, dan herlaadt de app zichzelf zo automatisch.');
+  } catch (e) {
+    window.location.reload();
+  }
+}
+
 function setUi(patch){ Object.assign(state, patch); render(); }
+/* Zet een geschiedenis-stap voordat een subscherm/overlay opengaat, zodat de
+   terugknop van de telefoon (of de gebaar-navigatie) dat subscherm sluit in
+   plaats van de hele app af te sluiten. */
+function naarSubscherm(patch){ history.pushState({ sub: true }, ''); setUi(patch); }
 function commit(patch){
   Object.assign(state, patch);
   render();
@@ -278,7 +298,7 @@ function kleinerMaken(file){
 function openSheet(soort){
   const f = vinden(soort);
   const start = Math.max(3, Math.round(f.max * 0.35));
-  setUi({ sheet: { soort, lengte: start, weet: true, plekId: null, nieuwOpen: false, nieuwNaam: '', foto: null, gps: 'zoeken', coords: null }, info: null });
+  naarSubscherm({ sheet: { soort, lengte: start, weet: true, plekId: null, nieuwOpen: false, nieuwNaam: '', foto: null, gps: 'zoeken', coords: null }, info: null });
   if (!navigator.geolocation) { gpsKlaar('nee', null); return; }
   navigator.geolocation.getCurrentPosition(
     p => gpsKlaar('ok', { lat: p.coords.latitude, lon: p.coords.longitude }),
@@ -334,6 +354,11 @@ function bewaarVangst(){
     diploma = { kop: 'Nieuwe sticker', titel: 'Goed gedaan!', svg: svgVoor(f, VISSEN.indexOf(f), 'd'), vangst: v, sub: 'Je hebt er een sticker bij verdiend.', badges: nieuw };
   }
   commit({ vangsten, plekken });
+  /* Het vangst-formulier had al een geschiedenis-stap (voor de terugknop
+     van de telefoon); die entry blijft staan, dus voor het diploma-scherm
+     erbovenop komt er nu nog een stap bij zodat de tel-knop straks eerst
+     het diploma sluit en pas daarna verder teruggaat. */
+  if (diploma) history.pushState({ sub: true }, '');
   setUi({ sheet: null, diploma });
 }
 function wisVangst(id){ commit({ vangsten: state.vangsten.filter(v => v.id !== id) }); }
@@ -382,7 +407,7 @@ function renderVangen(){
   const kaarten = VISSEN.map((f, i) => {
     const n = perSoortDag[f.n] || 0;
     const tikId = on(() => openSheet(f.n));
-    const infoId = on(e => { e.stopPropagation(); setUi({ info: f.n, tab: 'info' }); });
+    const infoId = on(e => { e.stopPropagation(); naarSubscherm({ info: f.n, tab: 'info' }); });
     const beeld = (alsFoto && f.foto)
       ? `<img src="${f.foto}" alt="Foto van een ${esc(f.n).toLowerCase()}" style="display:block;width:100%;height:78px;object-fit:cover;border-radius:14px">`
       : svgVoor(f, i, 'k');
@@ -439,7 +464,7 @@ function renderVangen(){
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${kaarten}</div>
     ${vandaagLijst}
-    <div style="text-align:center;font-size:11px;color:#B7C6C4;margin-top:24px">Visteller v${APP_VERSIE}</div>
+    <button data-click="${on(controleerUpdate)}" style="all:unset;display:block;width:100%;text-align:center;font-size:11px;color:#B7C6C4;margin-top:24px;cursor:pointer">Visteller v${APP_VERSIE} · tik om te controleren op updates</button>
   </div>`;
 }
 function regelVan(v){
@@ -450,6 +475,11 @@ function regelVan(v){
   const t = new Date(v.ts);
   d.push(String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'));
   return d.join(' · ');
+}
+
+/* ---------- gedeelde terugknop (opvallender dan platte tekst) ---------- */
+function terugKnop(id, tekst){
+  return `<button data-click="${id}" style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:2px solid #CBDCD9;color:#17545C;font-size:15px;font-weight:800;padding:10px 16px;border-radius:14px;margin-bottom:12px;box-shadow:0 2px 0 #CBDCD9"><span style="font-size:19px;line-height:1">←</span>${esc(tekst)}</button>`;
 }
 
 /* ---------- gedeelde header (zelfde stijl als het Vangen-scherm) ---------- */
@@ -490,7 +520,7 @@ function renderVerzameling(){
   const verzamel = VISSEN.map((f, i) => {
     const n = perSoort[f.n] || 0;
     const r = record[f.n];
-    const id = on(() => setUi({ info: f.n, tab: 'info' }));
+    const id = on(() => naarSubscherm({ info: f.n, tab: 'info' }));
     return `<button data-click="${id}" style="all:unset;display:block;box-sizing:border-box;position:relative;background:${n ? '#ffffff' : '#F1F6F4'};border:3px solid ${n ? '#F0A81E' : '#E2EBE8'};border-radius:22px;padding:12px 8px 10px;text-align:center;box-shadow:0 3px 0 #CBDCD9">
       <span style="display:grid;place-items:center;height:70px;overflow:hidden;opacity:${n ? 1 : .85}">${svgVoor(f, i, 'v', n === 0)}</span>
       <span style="display:block;font-size:15px;font-weight:800;margin-top:4px;color:${n ? '#123A3F' : '#8AA3A4'}">${esc(f.n)}</span>
@@ -504,7 +534,7 @@ function renderVerzameling(){
     const inhoud = `<span style="flex:none;width:44px;height:44px;border-radius:50%;background:${verdiend ? b.kl : '#CBDCD9'};color:#fff;display:grid;place-items:center;font-size:17px;font-weight:800;line-height:1">${b.teken}</span>
     <span style="font-size:14px;font-weight:700;line-height:1.25;color:${verdiend ? '#123A3F' : '#8AA3A4'}">${esc(b.label)}</span>`;
     if (!verdiend) return `<div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:10px;box-shadow:0 2px 0 #CBDCD9;opacity:.6">${inhoud}</div>`;
-    const id = on(() => setUi({ badgeOpen: b.id }));
+    const id = on(() => naarSubscherm({ badgeOpen: b.id }));
     return `<button data-click="${id}" style="all:unset;display:flex;box-sizing:border-box;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:10px;box-shadow:0 2px 0 #CBDCD9;cursor:pointer">${inhoud}</button>`;
   }).join('');
 
@@ -566,7 +596,7 @@ function renderDagen(){
       const plek = {}; vs.forEach(v => { const pn = plekNaam(v.plekId); if (pn) plek[pn] = 1; });
       const pk = Object.keys(plek);
       const regel = Object.keys(per).map(k => k + ' ' + per[k] + '×').join(', ') + (pk.length ? ' — ' + pk.join(', ') : '');
-      const id = on(() => setUi({ tab: 'dag', dagOpen: d }));
+      const id = on(() => naarSubscherm({ tab: 'dag', dagOpen: d }));
       return `<button data-click="${id}" style="all:unset;display:flex;box-sizing:border-box;width:100%;align-items:center;gap:12px;background:#fff;border-radius:18px;padding:13px 14px;margin-bottom:10px;box-shadow:0 3px 0 #CBDCD9">
         <span style="flex:1;min-width:0"><span style="display:block;font-size:16px;font-weight:800">${esc(langeDag(d))}</span><span style="display:block;font-size:13px;color:#6E8A8C;line-height:1.35">${esc(regel)}</span></span>
         <span style="flex:none;font-size:24px;font-weight:800;color:#1E7A8C">${vs.length}</span>
@@ -608,7 +638,7 @@ function renderPlekken(){
       if (top) stukjes.push('meestal ' + top.toLowerCase() + ' (' + per[top] + '×)');
       if (grootste) stukjes.push('grootste ' + grootste + ' cm');
       if (laatst) stukjes.push('laatst ' + korteDag(laatst));
-      const openId = on(() => setUi({ tab: 'plek', plekOpen: p.id }));
+      const openId = on(() => naarSubscherm({ tab: 'plek', plekOpen: p.id }));
       const hernoemId = on(() => hernoemPlek(p));
       const fotoId = on(e => plekFoto(p.id, e));
       const regel = vs.length ? ((vs.length === 1 ? '1 vis' : vs.length + ' vissen') + ' · ' + dgN + (dgN === 1 ? ' dag' : ' dagen')) : 'nog geen vangst van ' + ikNu.naam;
@@ -642,7 +672,7 @@ function renderDag(){
   const eigen = state.vangsten.filter(v => (v.visser || 'v1') === state.actief);
   const dd = state.dagOpen;
   const ddVangsten = dd ? eigen.filter(v => v.datum === dd).slice().sort((a, b) => b.ts - a.ts) : [];
-  const terugId = on(() => setUi({ tab: 'dagen', dagOpen: null }));
+  const terugId = on(() => history.back());
   const naarDezeDagId = on(() => setUi({ tab: 'vangen', datum: dd || state.datum }));
   const rijen = ddVangsten.map(v => {
     const f = vinden(v.soort);
@@ -666,7 +696,7 @@ function renderDag(){
     </div>`;
   }).join('');
   return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
-    <button data-click="${terugId}" style="background:none;border:0;color:#6E8A8C;font-size:15px;font-weight:800;padding:6px 0;margin-bottom:6px">‹ Alle visdagen</button>
+    ${terugKnop(terugId, 'Alle visdagen')}
     <h1 style="font-size:24px;font-weight:800;margin:0 0 2px">${dd ? esc(langeDag(dd)) : ''}</h1>
     <p style="font-size:15px;color:#6E8A8C;margin:0 0 16px">${ddVangsten.length === 1 ? '1 vis gevangen' : ddVangsten.length + ' vissen gevangen'}</p>
     ${rijen}
@@ -686,7 +716,7 @@ function renderPlek(){
   const pk = kaartje([po], eigen);
   const kaartUrl = po.lat != null ? `https://www.google.com/maps/search/?api=1&query=${po.lat},${po.lon}` : null;
 
-  const terugId = on(() => setUi({ tab: 'plekken', plekOpen: null }));
+  const terugId = on(() => history.back());
   const fotoId = on(e => plekFoto(po.id, e));
   const hernoemId = on(() => hernoemPlek(po));
 
@@ -721,7 +751,7 @@ function renderPlek(){
   }).join('');
 
   return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
-    <button data-click="${terugId}" style="background:none;border:0;color:#6E8A8C;font-size:15px;font-weight:800;padding:6px 0;margin-bottom:6px">‹ Alle visplekken</button>
+    ${terugKnop(terugId, 'Alle visplekken')}
     <h1 style="font-size:26px;font-weight:800;margin:0 0 12px">${esc(po.naam)}</h1>
     ${po.foto ? `<div style="margin-bottom:10px"><img src="${po.foto}" alt="Foto van ${esc(po.naam)}" style="display:block;width:100%;height:210px;object-fit:cover;border-radius:18px"></div>` : ''}
     <div style="display:flex;gap:8px;margin-bottom:14px">
@@ -752,7 +782,7 @@ function renderInfo(){
   const record = {}; eigen.forEach(v => { if (v.lengte) record[v.soort] = Math.max(record[v.soort] || 0, v.lengte); });
   const f = vinden(state.info), i = VISSEN.indexOf(f);
   const n = perSoort[f.n] || 0, r = record[f.n];
-  const terugId = on(() => setUi({ tab: 'vangen', info: null }));
+  const terugId = on(() => history.back());
   const plusId = on(() => openSheet(f.n));
   const kanVoorlezen = !!f.audio || !!window.speechSynthesis;
   const voorleesId = on(() => speelVisUit(f));
@@ -762,7 +792,7 @@ function renderInfo(){
   const vangstenHtml = vangstenVanSoort.length ? `<div style="margin-bottom:14px">
     <h3 style="font-size:17px;font-weight:800;margin:0 0 10px">Al mijn vangsten van deze soort</h3>
     ${vangstenVanSoort.map(v => {
-      const openId = on(() => setUi({ tab: 'dag', dagOpen: v.datum }));
+      const openId = on(() => naarSubscherm({ tab: 'dag', dagOpen: v.datum }));
       const diplomaId = on(() => deelDiploma(v));
       const t = new Date(v.ts);
       const p = state.plekken.find(x => x.id === v.plekId);
@@ -778,7 +808,7 @@ function renderInfo(){
   </div>` : '';
 
   return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
-    <button data-click="${terugId}" style="background:none;border:0;color:#6E8A8C;font-size:15px;font-weight:800;padding:6px 0;margin-bottom:6px">‹ Terug</button>
+    ${terugKnop(terugId, 'Terug')}
     <div style="background:#fff;border-radius:24px;padding:16px;box-shadow:0 3px 0 #CBDCD9;margin-bottom:14px">
       ${f.foto
         ? `<img src="${f.foto}" alt="Foto van een ${esc(f.n).toLowerCase()}" style="display:block;width:100%;height:230px;object-fit:cover;border-radius:16px;margin-bottom:12px">`
@@ -830,7 +860,7 @@ function renderSheet(){
   const naamId = on(e => { if (state.sheet) state.sheet.nieuwNaam = e.target.value; });
   const fotoId = on(fotoKies);
   const bewaarId = on(bewaarVangst);
-  const sluitId = on(() => setUi({ sheet: null }));
+  const sluitId = on(() => history.back());
   const stopId = on(e => e.stopPropagation());
 
   return `<div data-click="${sluitId}" style="position:fixed;inset:0;background:rgba(11,50,55,.55);z-index:40;display:flex;align-items:flex-end;justify-content:center">
@@ -867,7 +897,7 @@ function renderSheet(){
           ${s.foto ? 'Foto toegevoegd ✓' : 'Foto maken (mag ook niet)'}
           <input type="file" accept="image/*" data-change="${fotoId}" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
         </label>
-        <button data-click="${sluitId}" style="flex:none;background:none;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:14px;padding:12px 18px;font-size:14px;font-weight:700">Stop</button>
+        <button data-click="${sluitId}" style="flex:none;display:flex;align-items:center;gap:6px;background:#FCE9E5;border:2px solid #D9482F;color:#D9482F;border-radius:14px;padding:12px 18px;font-size:14px;font-weight:800">✕ Stop</button>
       </div>
     </div>
   </div>`;
@@ -877,7 +907,7 @@ function renderSheet(){
 function renderDiploma(){
   const d = state.diploma;
   const deelId = on(() => deelDiploma(d.vangst));
-  const sluitId = on(() => setUi({ diploma: null }));
+  const sluitId = on(() => history.back());
   const badges = d.badges.map(b => `<div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.14);border-radius:16px;padding:10px 14px;margin-bottom:8px;min-width:260px;text-align:left">
     <span style="flex:none;width:40px;height:40px;border-radius:50%;background:${b.kl};display:grid;place-items:center;font-size:16px;font-weight:800">${b.teken}</span>
     <span style="font-size:15px;font-weight:700;line-height:1.25">Nieuwe sticker: ${esc(b.label)}</span>
@@ -898,7 +928,7 @@ function renderBadgeScherm(){
   const b = BADGES.find(x => x.id === state.badgeOpen);
   if (!b) return '';
   const deelId = on(() => deelBadge(b));
-  const sluitId = on(() => setUi({ badgeOpen: null }));
+  const sluitId = on(() => history.back());
   return `<div style="position:fixed;inset:0;z-index:60;background:linear-gradient(170deg,#1E7A8C,#134A52);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
     <div style="font-size:14px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.75">Sticker</div>
     <div style="width:140px;height:140px;border-radius:50%;background:${b.kl};display:grid;place-items:center;font-size:56px;font-weight:800;margin:18px 0;box-shadow:0 6px 0 rgba(0,0,0,.15)">${b.teken}</div>
@@ -971,8 +1001,22 @@ document.addEventListener('input', e => {
   if (el) { const fn = registry[el.getAttribute('data-input')]; if (fn) fn(e); }
 });
 
+/* De terugknop/terug-gebaar van de telefoon vuurt 'popstate' i.p.v. de app
+   te sluiten (dankzij de pushState-stap bij het openen van een subscherm in
+   naarSubscherm()). Sluit hier telkens het "bovenste" open subscherm — in
+   dezelfde volgorde als waarin ze geopend kunnen worden. */
+window.addEventListener('popstate', () => {
+  if (state.sheet) { setUi({ sheet: null }); return; }
+  if (state.diploma) { setUi({ diploma: null }); return; }
+  if (state.badgeOpen) { setUi({ badgeOpen: null }); return; }
+  if (state.tab === 'info') { setUi({ tab: 'vangen', info: null }); return; }
+  if (state.tab === 'dag') { setUi({ tab: 'dagen', dagOpen: null }); return; }
+  if (state.tab === 'plek') { setUi({ tab: 'plekken', plekOpen: null }); return; }
+});
+
 /* ---------- opstarten ---------- */
 async function init(){
+  history.replaceState({ app: true }, '');
   vraagBlijvendeOpslag();
   if (window.speechSynthesis) window.speechSynthesis.getVoices();
   const saved = await laadStaat();

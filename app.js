@@ -5,7 +5,7 @@ const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 14;
+const APP_VERSIE = 15;
 const root = document.getElementById('app');
 
 const state = {
@@ -378,6 +378,14 @@ function hernoemPlek(p){
   const t = naam.trim(); if (!t) return;
   commit({ plekken: state.plekken.map(x => x.id === p.id ? { ...x, naam: t } : x) });
 }
+function verwijderPlek(p){
+  if (!window.confirm('"' + p.naam + '" verwijderen? Je vangsten blijven bewaard, alleen de plek zelf verdwijnt.')) return;
+  commit({
+    plekken: state.plekken.filter(x => x.id !== p.id),
+    vangsten: state.vangsten.map(v => v.plekId === p.id ? { ...v, plekId: null } : v)
+  });
+  history.back();
+}
 function wisAlles(){
   if (window.confirm('Alle vissen, dagen en plekken van iedereen wissen?')) commit({ vangsten: [], plekken: [] });
 }
@@ -719,6 +727,7 @@ function renderPlek(){
   const terugId = on(() => history.back());
   const fotoId = on(e => plekFoto(po.id, e));
   const hernoemId = on(() => hernoemPlek(po));
+  const verwijderId = on(() => verwijderPlek(po));
 
   const soortenHtml = Object.keys(per).sort((a, b) => per[b] - per[a]).map(naam => {
     const f = vinden(naam);
@@ -771,6 +780,7 @@ function renderPlek(){
     ${vs.length === 0 ? `<p style="background:#fff;border-radius:18px;padding:18px;color:#6E8A8C;font-size:15px;line-height:1.5;box-shadow:0 3px 0 #CBDCD9">Hier heb je nog niets gevangen.</p>` : ''}
     ${soortenHtml}
     ${dagenHtml}
+    <button data-click="${verwijderId}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;background:#FCE9E5;border:2px solid #D9482F;color:#D9482F;border-radius:14px;padding:14px;font-weight:800;font-size:14px;margin-top:24px">🗑️ Plek verwijderen</button>
   </div>`;
 }
 

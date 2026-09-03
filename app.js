@@ -1,6 +1,11 @@
 /* Visteller — app-logica en rendering. Vanilla JS, geen framework nodig. */
 
 const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
+
+/* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
+   zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
+   telefoon echt de nieuwste versie heeft opgehaald. */
+const APP_VERSIE = 9;
 const root = document.getElementById('app');
 
 const state = {
@@ -448,6 +453,7 @@ function renderVangen(){
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${kaarten}</div>
     ${vandaagLijst}
+    <div style="text-align:center;font-size:11px;color:#B7C6C4;margin-top:24px">Visteller v${APP_VERSIE}</div>
   </div>`;
 }
 function regelVan(v){

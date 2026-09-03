@@ -49,10 +49,16 @@ function hernoemVisser(v){
    verwezen wordt vlak voordat hij afspeelt — daarom hier bewaard. */
 let laatsteUtterance = null;
 
+/* Zolang deze interval loopt wordt de lopende speak() om de paar seconden
+   even gepauzeerd/hervat — bekende workaround voor een Chrome-bug waarbij
+   langere zinnen na ~15s abrupt stoppen of gaan haperen. */
+let ttsKeepAlive = null;
+
 function voorlezen(tekst){
   try {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
+    if (ttsKeepAlive) { clearInterval(ttsKeepAlive); ttsKeepAlive = null; }
     const u = new SpeechSynthesisUtterance(tekst);
     u.lang = 'nl-NL'; u.rate = .9; u.pitch = 1.05;
     /* Meteen afspelen, ook als de stemmenlijst nog leeg is: op Android is die
@@ -64,11 +70,25 @@ function voorlezen(tekst){
       const nl = stemmen.filter(s => /^nl/i.test(s.lang));
       const vrouw = /female|vrouw|woman|lotte|ellen|fenna|laura|claire|nl-NL-Standard-A|nl-NL-Wavenet-A|nl-nl-x-dma|google nederlands/i;
       const isVrouw = s => vrouw.test(s.name) && !/xander|male\b/i.test(s.name);
-      const stem = nl.find(isVrouw) || nl.find(s => !/xander|male\b/i.test(s.name)) || nl[0];
+      /* Stemmen die niet lokaal op het toestel staan (localService===false)
+         komen van een online spraak-engine (bv. Google's netwerkstemmen) en
+         klinken vrijwel altijd veel natuurlijker dan de ingebouwde,
+         robotachtige offline stem — dus die hebben voorkeur. */
+      const netwerkStem = s => s.localService === false;
+      const stem = nl.find(s => netwerkStem(s) && isVrouw(s))
+        || nl.find(netwerkStem)
+        || nl.find(isVrouw)
+        || nl.find(s => !/xander|male\b/i.test(s.name))
+        || nl[0];
       if (stem) u.voice = stem;
     }
     laatsteUtterance = u;
     window.speechSynthesis.speak(u);
+    ttsKeepAlive = setInterval(() => {
+      if (!window.speechSynthesis.speaking) { clearInterval(ttsKeepAlive); ttsKeepAlive = null; return; }
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    }, 4000);
   } catch (e) {}
 }
 

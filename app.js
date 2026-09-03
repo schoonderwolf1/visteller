@@ -5,7 +5,7 @@ const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 9;
+const APP_VERSIE = 10;
 const root = document.getElementById('app');
 
 const state = {
@@ -54,16 +54,10 @@ function hernoemVisser(v){
    verwezen wordt vlak voordat hij afspeelt — daarom hier bewaard. */
 let laatsteUtterance = null;
 
-/* Zolang deze interval loopt wordt de lopende speak() om de paar seconden
-   even gepauzeerd/hervat — bekende workaround voor een Chrome-bug waarbij
-   langere zinnen na ~15s abrupt stoppen of gaan haperen. */
-let ttsKeepAlive = null;
-
 function voorlezen(tekst){
   try {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    if (ttsKeepAlive) { clearInterval(ttsKeepAlive); ttsKeepAlive = null; }
     const u = new SpeechSynthesisUtterance(tekst);
     u.lang = 'nl-NL'; u.rate = .9; u.pitch = 1.05;
     /* Meteen afspelen, ook als de stemmenlijst nog leeg is: op Android is die
@@ -75,25 +69,11 @@ function voorlezen(tekst){
       const nl = stemmen.filter(s => /^nl/i.test(s.lang));
       const vrouw = /female|vrouw|woman|lotte|ellen|fenna|laura|claire|nl-NL-Standard-A|nl-NL-Wavenet-A|nl-nl-x-dma|google nederlands/i;
       const isVrouw = s => vrouw.test(s.name) && !/xander|male\b/i.test(s.name);
-      /* Stemmen die niet lokaal op het toestel staan (localService===false)
-         komen van een online spraak-engine (bv. Google's netwerkstemmen) en
-         klinken vrijwel altijd veel natuurlijker dan de ingebouwde,
-         robotachtige offline stem — dus die hebben voorkeur. */
-      const netwerkStem = s => s.localService === false;
-      const stem = nl.find(s => netwerkStem(s) && isVrouw(s))
-        || nl.find(netwerkStem)
-        || nl.find(isVrouw)
-        || nl.find(s => !/xander|male\b/i.test(s.name))
-        || nl[0];
+      const stem = nl.find(isVrouw) || nl.find(s => !/xander|male\b/i.test(s.name)) || nl[0];
       if (stem) u.voice = stem;
     }
     laatsteUtterance = u;
     window.speechSynthesis.speak(u);
-    ttsKeepAlive = setInterval(() => {
-      if (!window.speechSynthesis.speaking) { clearInterval(ttsKeepAlive); ttsKeepAlive = null; return; }
-      window.speechSynthesis.pause();
-      window.speechSynthesis.resume();
-    }, 4000);
   } catch (e) {}
 }
 
@@ -467,15 +447,20 @@ function regelVan(v){
 }
 
 /* ---------- gedeelde header (zelfde stijl als het Vangen-scherm) ---------- */
-function renderHeaderKop(titel, ondertitel, extraHtml){
+function renderHeaderKop(titel, ondertitel, opts){
+  opts = opts || {};
+  const badge = opts.badge != null ? `<div style="flex:none;width:56px;height:56px;border-radius:50%;background:#F0A81E;color:#123A3F;display:grid;place-items:center;font-size:24px;font-weight:800;box-shadow:0 3px 0 #C88A12">${opts.badge}</div>` : '';
   return `<div style="background:linear-gradient(160deg,#1E7A8C 0%,#17545C 60%,#134A52 100%);border-radius:0 0 26px 26px;margin:0 -14px 18px;padding:calc(env(safe-area-inset-top) + 18px) 18px 20px;color:#fff;position:relative;overflow:hidden">
     <div style="position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.06)"></div>
-    <div style="position:relative">
-      <div style="font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.7">Visteller</div>
-      <div style="font-size:22px;font-weight:800;line-height:1.15;margin-top:2px">${esc(titel)}</div>
-      ${ondertitel ? `<div style="font-size:15px;opacity:.85;margin-top:4px;line-height:1.35">${esc(ondertitel)}</div>` : ''}
+    <div style="position:relative;display:flex;align-items:center;gap:14px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.7">Visteller</div>
+        <div style="font-size:22px;font-weight:800;line-height:1.15;margin-top:2px">${esc(titel)}</div>
+        ${ondertitel ? `<div style="font-size:15px;opacity:.85;margin-top:4px;line-height:1.35">${esc(ondertitel)}</div>` : ''}
+      </div>
+      ${badge}
     </div>
-    ${extraHtml || ''}
+    ${opts.extraHtml || ''}
   </div>`;
 }
 function headerTellers(items){
@@ -540,7 +525,7 @@ function renderVerzameling(){
   ]);
 
   return `<div>
-    ${renderHeaderKop('Verzameling van ' + ikNu.naam, soortTekst, statsHtml)}
+    ${renderHeaderKop('Verzameling van ' + ikNu.naam, soortTekst, { extraHtml: statsHtml })}
     <h3 style="font-size:17px;font-weight:800;margin:0 0 4px">Verzamelkaart</h3>
     <p style="font-size:14px;color:#6E8A8C;margin:0 0 12px">Grijze vissen heb je nog nooit gevangen.</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:26px">${verzamel}</div>
@@ -590,7 +575,7 @@ function renderDagen(){
   ]);
 
   return `<div>
-    ${renderHeaderKop('Visdagen', 'Elke dag dat ' + ikNu.naam + ' heeft gevist.', dagenStats)}
+    ${renderHeaderKop('Visdagen', 'Elke dag dat ' + ikNu.naam + ' heeft gevist.', { extraHtml: dagenStats })}
     ${dagenHtml}
   </div>`;
 }
@@ -599,14 +584,6 @@ function renderDagen(){
 function renderPlekken(){
   const ikNu = state.vissers.find(x => x.id === state.actief) || state.vissers[0] || { naam: '' };
   const eigen = state.vangsten.filter(v => (v.visser || 'v1') === state.actief);
-
-  const perPlekTel = {};
-  eigen.forEach(v => { if (v.plekId) perPlekTel[v.plekId] = (perPlekTel[v.plekId] || 0) + 1; });
-  const plekkenStats = headerTellers([
-    [state.plekken.length, state.plekken.length === 1 ? 'plek' : 'plekken'],
-    [eigen.filter(v => v.plekId).length, 'vissen'],
-    [Object.values(perPlekTel).reduce((a, n) => Math.max(a, n), 0), 'beste plek']
-  ]);
 
   const kaart = kaartje(state.plekken, eigen);
   const kaartHtml = kaart ? `<div style="background:#fff;border-radius:18px;padding:10px;margin-bottom:10px;box-shadow:0 3px 0 #CBDCD9">${kaart}</div>` : '';
@@ -648,7 +625,7 @@ function renderPlekken(){
     }).join('');
 
   return `<div>
-    ${renderHeaderKop('Visplekken', 'Sta je vlak bij een plek die je al kent, dan gebruikt de app die plek weer.', plekkenStats)}
+    ${renderHeaderKop('Visplekken', 'Sta je vlak bij een plek die je al kent, dan gebruikt de app die plek weer.', { badge: state.plekken.length })}
     ${kaartHtml}
     ${plekLijst}
   </div>`;

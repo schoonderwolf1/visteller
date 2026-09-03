@@ -1,7 +1,7 @@
 /* Visteller service worker — app blijft werken zonder internet.
    HTML en scripts: netwerk eerst (zodat updates altijd doorkomen),
    met de cache als terugval. Overige bestanden: cache eerst. */
-const CACHE = 'visteller-v2';
+const CACHE = 'visteller-v3';
 const SHELL = [
   './',
   './index.html',
@@ -22,7 +22,19 @@ const SHELL = [
   './photos/zeelt.webp',
   './photos/paling.webp',
   './photos/winde.webp',
-  './photos/alver.webp'
+  './photos/alver.webp',
+  './audio/baars.mp3',
+  './audio/snoek.mp3',
+  './audio/snoekbaars.mp3',
+  './audio/blankvoorn.mp3',
+  './audio/ruisvoorn.mp3',
+  './audio/karper.mp3',
+  './audio/brasem.mp3',
+  './audio/kolblei.mp3',
+  './audio/zeelt.mp3',
+  './audio/paling.mp3',
+  './audio/winde.mp3',
+  './audio/alver.mp3'
 ];
 
 self.addEventListener('install', e => {

@@ -5,7 +5,7 @@ const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 10;
+const APP_VERSIE = 11;
 const root = document.getElementById('app');
 
 const state = {
@@ -75,6 +75,22 @@ function voorlezen(tekst){
     laatsteUtterance = u;
     window.speechSynthesis.speak(u);
   } catch (e) {}
+}
+
+/* Echte, vooraf ingesproken audio klinkt op elke telefoon hetzelfde en
+   natuurlijk — dus die heeft voorrang. Alleen als die er niet is (of niet
+   wil afspelen) valt de app terug op de tekst-naar-spraak-stem van het
+   toestel zelf. */
+let huidigeAudio = null;
+function speelVisUit(f){
+  const terugval = () => voorlezen(f.n + '. ' + f.feit.wist + ' Hij wordt ' + f.feit.groot + ' groot en eet ' + f.feit.eet + '.');
+  if (!f.audio) { terugval(); return; }
+  try {
+    if (huidigeAudio) { huidigeAudio.pause(); huidigeAudio = null; }
+    const a = new Audio(f.audio);
+    huidigeAudio = a;
+    a.play().catch(terugval);
+  } catch (e) { terugval(); }
 }
 
 function kaartje(plekken, eigen, minSpan){
@@ -748,8 +764,8 @@ function renderInfo(){
   const n = perSoort[f.n] || 0, r = record[f.n];
   const terugId = on(() => setUi({ tab: 'vangen', info: null }));
   const plusId = on(() => openSheet(f.n));
-  const kanVoorlezen = !!window.speechSynthesis;
-  const voorleesId = on(() => voorlezen(f.n + '. ' + f.feit.wist + ' Hij wordt ' + f.feit.groot + ' groot en eet ' + f.feit.eet + '.'));
+  const kanVoorlezen = !!f.audio || !!window.speechSynthesis;
+  const voorleesId = on(() => speelVisUit(f));
   const jij = (n ? (n === 1 ? '1 keer' : n + ' keer') : 'nog geen') + (r ? ' · record ' + r + ' cm' : '');
 
   const vangstenVanSoort = eigen.filter(v => v.soort === f.n).slice().sort((a, b) => b.ts - a.ts);

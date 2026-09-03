@@ -9,7 +9,7 @@ const LENGTE_MAX = 150;
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 20;
+const APP_VERSIE = 21;
 const root = document.getElementById('app');
 
 const state = {

@@ -1,7 +1,7 @@
 /* Visteller service worker — app blijft werken zonder internet.
    HTML en scripts: netwerk eerst (zodat updates altijd doorkomen),
    met de cache als terugval. Overige bestanden: cache eerst. */
-const CACHE = 'visteller-v4';
+const CACHE = 'visteller-v5';
 const SHELL = [
   './',
   './index.html',
@@ -64,8 +64,12 @@ self.addEventListener('fetch', e => {
     /\.(html|js)$/i.test(pad);
 
   if (versGeval) {
+    /* cache: 'no-store' dwingt een echte netwerk-aanvraag af. Zonder dit kan
+       de browser (of GitHub Pages' eigen cache-headers) deze fetch stilletjes
+       uit de HTTP-cache beantwoorden, waardoor "netwerk eerst" in de praktijk
+       toch een oude versie teruggeeft en updates nooit doorkomen. */
     e.respondWith(
-      fetch(req).then(res => bewaar(req, res)).catch(() => caches.match(req))
+      fetch(req, { cache: 'no-store' }).then(res => bewaar(req, res)).catch(() => caches.match(req))
     );
     return;
   }

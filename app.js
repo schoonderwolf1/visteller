@@ -1,11 +1,15 @@
 /* Visteller — app-logica en rendering. Vanilla JS, geen framework nodig. */
 
 const RADIUS = 80; // meter: binnen deze afstand is het dezelfde visplek
+/* Losse, ruime bovengrens voor de lengte-schuif: een uitzonderlijk grote vis
+   (groter dan de "hoe groot wordt hij normaal"-maat f.max) moet je alsnog
+   kunnen invoeren, dus de schuif stopt niet bij het soort-gemiddelde. */
+const LENGTE_MAX = 150;
 
 /* Versienummer = het PR-nummer waarin deze wijziging is gemerged. Puur
    zichtbaar onderaan het Vangen-scherm, zodat je kunt checken of de
    telefoon echt de nieuwste versie heeft opgehaald. */
-const APP_VERSIE = 17;
+const APP_VERSIE = 18;
 const root = document.getElementById('app');
 
 const state = {
@@ -302,11 +306,14 @@ function kleinerMaken(file){
       const img = new Image();
       img.onerror = rej;
       img.onload = () => {
-        const m = 520, sc = Math.min(1, m / Math.max(img.width, img.height));
+        /* Groter en met minder compressie dan voorheen (was 520px/.6): een
+           vangst- of plekfoto wordt op het diploma flink uitvergroot, en een
+           te kleine/hard gecomprimeerde bron oogt daar dan wazig. */
+        const m = 1200, sc = Math.min(1, m / Math.max(img.width, img.height));
         const c = document.createElement('canvas');
         c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        res(c.toDataURL('image/jpeg', .6));
+        res(c.toDataURL('image/jpeg', .85));
       };
       img.src = r.result;
     };
@@ -885,7 +892,7 @@ function renderSheet(){
     : 'Een nieuwe visplek! Geef hem een naam.';
 
   const minId = on(() => zetSheet({ lengte: Math.max(3, s.lengte - 1), weet: true }));
-  const plusId = on(() => zetSheet({ lengte: Math.min(f.max, s.lengte + 1), weet: true }));
+  const plusId = on(() => zetSheet({ lengte: Math.min(LENGTE_MAX, s.lengte + 1), weet: true }));
   const rangeId = on(e => zetSheet({ lengte: parseInt(e.target.value, 10) || 3, weet: true }));
   const weetId = on(() => zetSheet({ weet: !s.weet }));
   /* Geen her-render bij elke toets: anders kan een re-render de knop
@@ -910,7 +917,7 @@ function renderSheet(){
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <button data-click="${minId}" aria-label="Korter" style="flex:none;width:52px;height:52px;border-radius:16px;background:#fff;border:2px solid #CBDCD9;color:#17545C;font-size:26px;font-weight:800;line-height:1">−</button>
-          <input type="range" min="3" max="${f.max}" step="1" value="${s.lengte}" data-change="${rangeId}" style="flex:1;min-width:0;accent-color:#F0A81E;height:44px">
+          <input type="range" min="3" max="${LENGTE_MAX}" step="1" value="${s.lengte}" data-change="${rangeId}" style="flex:1;min-width:0;accent-color:#F0A81E;height:44px">
           <button data-click="${plusId}" aria-label="Langer" style="flex:none;width:52px;height:52px;border-radius:16px;background:#fff;border:2px solid #CBDCD9;color:#17545C;font-size:26px;font-weight:800;line-height:1">+</button>
         </div>
         <button data-click="${weetId}" style="margin-top:10px;background:${s.weet ? '#fff' : '#1E7A8C'};border:2px solid ${s.weet ? '#CBDCD9' : '#1E7A8C'};color:${s.weet ? '#6E8A8C' : '#fff'};border-radius:12px;padding:9px 14px;font-size:14px;font-weight:700">Weet ik niet</button>

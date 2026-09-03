@@ -275,6 +275,11 @@ async function plekFoto(id, e){
   if (!file) return;
   try { const url = await kleinerMaken(file); commit({ plekken: state.plekken.map(p => p.id === id ? { ...p, foto: url } : p) }); } catch (err) {}
 }
+async function vangstFoto(id, e){
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  try { const url = await kleinerMaken(file); commit({ vangsten: state.vangsten.map(v => v.id === id ? { ...v, foto: url } : v) }); } catch (err) {}
+}
 function hernoemPlek(p){
   const naam = window.prompt('Hoe heet deze visplek?', p.naam);
   if (naam == null) return;
@@ -297,7 +302,7 @@ function renderVangen(){
     const actief = v.id === state.actief;
     const tel = state.vangsten.filter(x => (x.visser || 'v1') === v.id).length;
     const id = on(() => kiesVisser(v));
-    return `<button data-click="${id}" style="flex:1;background:${actief ? '#F0A81E' : 'rgba(255,255,255,.14)'};border:0;color:${actief ? '#123A3F' : '#EAF3F1'};border-radius:14px;padding:11px 8px;font-size:15px;font-weight:800">${esc(v.naam)} · ${tel}</button>`;
+    return `<button data-click="${id}" style="flex:1;background:${actief ? '#F0A81E' : 'rgba(255,255,255,.14)'};border:0;color:${actief ? '#123A3F' : '#EAF3F1'};border-radius:14px;padding:11px 8px;font-size:15px;font-weight:800">${esc(v.naam)} · ${tel}${actief ? ' ✏️' : ''}</button>`;
   }).join('');
 
   const datumId = on(e => { if (e.target.value) setUi({ datum: e.target.value }); });
@@ -534,14 +539,21 @@ function renderDag(){
     const f = vinden(v.soort);
     const diplomaId = on(() => deelDiploma(v));
     const wisId = on(() => wisVangst(v.id));
+    const fotoId = on(e => vangstFoto(v.id, e));
     return `<div style="background:#fff;border-radius:18px;padding:10px 12px 10px 6px;margin-bottom:10px;box-shadow:0 3px 0 #CBDCD9">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="flex:none;width:86px;height:46px;display:grid;place-items:center;overflow:hidden">${svgVoor(f, VISSEN.indexOf(f), 'm')}</span>
         <span style="flex:1;min-width:0"><span style="display:block;font-size:17px;font-weight:800">${esc(v.soort)}</span><span style="display:block;font-size:13px;color:#6E8A8C;line-height:1.35">${esc(regelVan(v))}</span></span>
-        <button data-click="${diplomaId}" style="flex:none;background:#F4F8F7;border:2px solid #CBDCD9;color:#17545C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:800">Diploma</button>
         <button data-click="${wisId}" aria-label="Deze vangst weghalen" style="flex:none;width:38px;height:38px;border-radius:50%;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;font-size:17px;font-weight:800;line-height:1">×</button>
       </div>
       ${v.foto ? `<img src="${v.foto}" alt="Foto van de vangst" style="display:block;width:100%;height:180px;object-fit:cover;border-radius:12px;margin-top:8px">` : ''}
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <label style="flex:1;position:relative;background:#F4F8F7;border:2px solid #CBDCD9;color:#6E8A8C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700;text-align:center">
+          ${v.foto ? 'Andere foto' : 'Foto toevoegen'}
+          <input type="file" accept="image/*" capture="environment" data-change="${fotoId}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0">
+        </label>
+        <button data-click="${diplomaId}" style="flex:1;background:#F4F8F7;border:2px solid #CBDCD9;color:#17545C;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:800">Diploma</button>
+      </div>
     </div>`;
   }).join('');
   return `<div style="padding-top:calc(env(safe-area-inset-top) + 18px)">
